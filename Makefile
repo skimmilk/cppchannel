@@ -27,7 +27,7 @@ SRC_PATH = src
 # General compiler flags
 COMPILE_FLAGS = -std=c++11 -Wall -Wextra -g
 # Additional release-specific flags
-RCOMPILE_FLAGS = -D NDEBUG
+RCOMPILE_FLAGS = -D NDEBUG -O3
 # Additional debug-specific flags
 DCOMPILE_FLAGS = -D DEBUG
 # Add additional include paths
@@ -35,9 +35,9 @@ INCLUDES = -I $(SRC_PATH)/
 # General linker settings
 LINK_FLAGS = -pthread
 # Additional release-specific linker settings
-RLINK_FLAGS = 
+RLINK_FLAGS =
 # Additional debug-specific linker settings
-DLINK_FLAGS = 
+DLINK_FLAGS =
 # Destination directory, like a jail or mounted system
 DESTDIR = /
 # Install path (bin/ is appended automatically)
