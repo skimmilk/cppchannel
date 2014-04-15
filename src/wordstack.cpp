@@ -59,10 +59,26 @@ CSP_DECL(genlist, CSP::nothing, string, int)(int length)
 			put(a);
 	else
 	{
-		genlist(length - 1) | lambda_read<string,string>([](
-					CSP::csp_pipe<string,string>* thisptr, string n){
-			thisptr->put(n);
-		}) | print();
+		// So this doesn't alias with the this in lambda_read when sending it to the lambda function
+		auto thisptr = this;
+		genlist(length - 1) |
+			// Read every word genlist sends
+			lambda_read<string,nothing>([thisptr,length](CSP::csp_pipe<string,nothing>*, string shorter)
+			{
+				// Try to get a word that differs in one character
+				// Turn i into si, into sin, sing, sting ,string
+				for (auto longer : dict[length-1])
+				{
+					int difference = 0;
+					for (int i = 0; i < length-1 && difference <= 1; i++)
+					{
+						if (shorter[i-difference] != longer[i])
+							difference++;
+					}
+					if (difference <= 1)
+						thisptr->put(longer);
+				}
+			});
 	}
 }
 
@@ -78,7 +94,8 @@ int main(int argc, const char* argv[])
 		thisptr->put("HELLO, LAMBDA " + n);
 		std::cout << "CALLING FROM LAMBDATOWN : " + n + "\n";
 	}) >>= strings;*/
-	cat(file) | grab("'",true) | print();
+	cat(file) | grab("'",true) >>= strings;
+	vec(strings) | print();
 
 	for (auto a : strings)
 		std::cout << a << "\n";

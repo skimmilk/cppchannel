@@ -26,7 +26,7 @@ CSP_DECL(cat, CSP::nothing, std::string, std::string) (std::string file)
 	std::ifstream input(file);
 	while (std::getline(input, line))
 		put(line);
-}
+} // cat
 
 /* to_lower
  * Outputs input, but in lower case
@@ -39,7 +39,7 @@ CSP_DECL(to_lower, std::string, std::string) ()
 		std::transform(line.begin(), line.end(), line.begin(), ::tolower);
 		put(line);
 	}
-}
+}// to_lower
 
 /* sort
  * Sorts stuff
@@ -86,7 +86,7 @@ CSP_DECL(grab, std::string, std::string, std::string, bool)
 		// Put string if the currently line contains search
 		if ((current_line.find(search) == std::string::npos) == invert)
 			put(current_line);
-}
+} // grab
 
 /* uniq
  * Removes duplicates
@@ -108,7 +108,8 @@ CSP_DECL(uniq_str, std::string, std::string, bool)(bool case_insensitive)
 
 		last = current;
 	}
-}
+} // uniq
+
 /* Generic uniq
  * Only thing different is that there is no case insensitive comparison
  */
@@ -144,14 +145,38 @@ CSP_DECL(print, std::string, CSP::nothing)()
 	std::string line;
 	while (read(line))
 		std::cout << line + "\n";
-}
+} // print
 // Prints to stderr
 CSP_DECL(print_log, std::string, CSP::nothing)()
 {
 	std::string line;
 	while (read(line))
 		std::cerr << line + "\n";
-}
+} // print_log
+
+/* vec
+ * Sends out items in a vector over a pipe
+ *  vector<string> a;
+ *  ...
+ *  vec(string) | print();
+ */
+template <typename t_in>
+class cat_generic : public CSP::csp_pipe<CSP::nothing, t_in, 512, std::vector<t_in>*>
+{
+public:
+	void run(std::vector<t_in>* kitty)
+	{
+		for (auto a : *kitty)
+			this->put(a);
+	}
+};
+template <typename t_in>
+CSP::csp_pipe<CSP::nothing, t_in, CSP_CACHE_DEFAULT, std::vector<t_in>*>
+		vec(std::vector<t_in>& kitty)
+{
+	return CSP::csp_pipe_create<
+			CSP::nothing, t_in, cat_generic<t_in>, CSP_CACHE_DEFAULT, std::vector<t_in>*>(&kitty);
+}/* vec */
 
 /* lambda_read
  * Iterate over a pipe in-line
@@ -188,8 +213,8 @@ CSP::csp_pipe
 		void(CSP::csp_pipe<t_in,t_out>*, t_in&)
 	>
 >
-		lambda_read(
-				std::function<void(CSP::csp_pipe<t_in, t_out>*, t_in&)>
+	lambda_read(
+		std::function<void(CSP::csp_pipe<t_in, t_out>*, t_in&)>
 					asdf)
 {
 	// madotsuki_eating_soup.jpg
@@ -205,7 +230,7 @@ CSP::csp_pipe
 		)&lambda_read_t<t_in,t_out>::run;
 
 	return result;
-}
+} // lambda_read
 
 }; /* namespace CSP */
 #define CSP_read(typein,typeout,varname) lambda_read<typein,typeout>(\
