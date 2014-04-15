@@ -40,7 +40,6 @@ private:
 
 public:
 	bool background;
-	std::tuple <t_args...> arguments;
 	csp_message_stream <t_in>* csp_input;
 	csp_message_stream <t_out> csp_output;
 
@@ -51,6 +50,13 @@ public:
 	// then waits for this lock to unlock so it doesn't read garbage csp_input
 	std::mutex wait_lock;
 	std::mutex* next_node_lock;
+
+	// Variable length...
+	// Putting this last allows for self-referential pipes to be called
+	//   through a pointer without knowing the size of the member to align
+	//   the other members, because there are no members below this variable
+	// Specifically fixes pipe_read
+	std::tuple <t_args...> arguments;
 
 	csp_pipe()
 	{
