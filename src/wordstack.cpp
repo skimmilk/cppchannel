@@ -59,11 +59,10 @@ CSP_DECL(genlist, CSP::nothing, string, int)(int length)
 			put(a);
 	else
 	{
-		// So this doesn't alias with the this in lambda_read when sending it to the lambda function
-		auto thisptr = this;
 		genlist(length - 1) |
 			// Read every word genlist sends
-			lambda_read<string,nothing>([thisptr,length](CSP::csp_pipe<string,nothing>*, string shorter)
+			lambda_read<string,nothing>([this,length]
+			                 (CSP::csp_pipe<string,nothing>*, string shorter)
 			{
 				// Try to get a word that differs in one character
 				// Turn i into si, into sin, sing, sting ,string
@@ -76,7 +75,7 @@ CSP_DECL(genlist, CSP::nothing, string, int)(int length)
 							difference++;
 					}
 					if (difference <= 1)
-						thisptr->put(longer);
+						this->put(longer);
 				}
 			});
 	}

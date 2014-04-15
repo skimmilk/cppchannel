@@ -150,11 +150,14 @@ public:
 		call(do_start_actually, thisargs);
 
 		// Clean up
-		csp_output.lock.lock();
-		csp_output.template write<cachesiz>(cache_write, cache_write_head - 1, false);
-		csp_output.finished = true;
-		csp_output.lock.unlock();
-		csp_output.antilock.unlock();
+		if (!is_nothing<t_out>::value)
+		{
+			csp_output.lock.lock();
+			csp_output.template write<cachesiz>(cache_write, cache_write_head - 1, false);
+			csp_output.finished = true;
+			csp_output.lock.unlock();
+			csp_output.antilock.unlock();
+		}
 		return true;
 	}
 private:
