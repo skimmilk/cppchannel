@@ -61,8 +61,8 @@ CSP_DECL(genlist, CSP::nothing, wordpair, int)(int length)
 	{
 		genlist(length - 1) |
 			// Read every word genlist sends
-			pipe_read<wordpair,nothing>([this,length]
-			                 (CSP::csp_chan<wordpair,nothing>*, wordpair& shorter)
+			chan_read<wordpair,nothing>([this,length]
+			                 (csp_chan<wordpair,nothing>*, wordpair& shorter)
 			{
 				// Try to get a word that differs in one character
 				// Turn i into si, into sin, sing, sting ,string
@@ -88,7 +88,7 @@ int main(int argc, const char* argv[])
 	cat(file) | grab("'", true) | to_lower() | sort<string>(false) |
 			uniq<string>() | elementize() >>= dict;
 
-	genlist(9) | pipe_read<wordpair,nothing>([](csp_chan<wordpair,nothing>*, wordpair& pair)
+	genlist(9) | chan_read<wordpair,nothing>([](csp_chan<wordpair,nothing>*, wordpair& pair)
 			{
 				std::cout << pair.word + " " + pair.whatmadeit + "\n";
 			});

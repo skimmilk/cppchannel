@@ -167,12 +167,12 @@ CSP::csp_chan<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
 
 }/* vec */
 
-/* pipe_read
+/* chan_read
  * Iterate over a pipe in-line
- * cat(file) | pipe_read<...>...
+ * cat(file) | chan_read<...>...
  */
 template <typename t_in, typename t_out>
-class pipe_read_t : public CSP::csp_chan<
+class chan_read_t : public CSP::csp_chan<
 		t_in, t_out, CSP_CACHE_DEFAULT,
 		std::function<void(CSP::csp_chan<t_in, t_out>*, t_in&)>>
 {
@@ -201,7 +201,7 @@ CSP::csp_chan
 		void(CSP::csp_chan<t_in,t_out>*, t_in&)
 	>
 >
-	pipe_read(
+	chan_read(
 		std::function<void(CSP::csp_chan<t_in, t_out>*, t_in&)>
 					asdf)
 {
@@ -215,13 +215,13 @@ CSP::csp_chan
 	result.arguments = std::make_tuple(asdf);
 	result.start = (void (thistype::*)
 					(std::function<void(CSP::csp_chan<t_in,t_out>*,t_in&)>)
-		)&pipe_read_t<t_in,t_out>::run;
+		)&chan_read_t<t_in,t_out>::run;
 
 	return result;
-} // pipe_read
+} // chan_read
 
 }; /* namespace CSP */
-#define CSP_read(typein,typeout,varname) pipe_read<typein,typeout>(\
+#define CSP_read(typein,typeout,varname) chan_read<typein,typeout>(\
 		[](CSP::csp_chan<typein,typeout>*thisptr, typein varname)
 
 

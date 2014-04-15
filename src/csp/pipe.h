@@ -55,7 +55,7 @@ public:
 	// Putting this last allows for self-referential pipes to be called
 	//   through a pointer without knowing the size of the member to align
 	//   the other members, because there are no members below this variable
-	// Specifically fixes pipe_read
+	// Specifically fixes chan_read
 	std::tuple <t_args...> arguments;
 
 	csp_chan()
