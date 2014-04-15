@@ -48,7 +48,7 @@ CSP_DECL(to_lower, std::string, std::string) ()
  */
 #define CSP_SORT_CACHE 512
 template <typename t_in>
-class sort_t_: public CSP::csp_pipe<t_in, t_in, CSP_SORT_CACHE , bool>
+class sort_t_: public CSP::csp_chan<t_in, t_in, CSP_SORT_CACHE , bool>
 {
 public:
 	void run(bool reverse)
@@ -70,9 +70,9 @@ public:
 	}
 };
 template <typename t_in>
-CSP::csp_pipe<t_in, t_in, CSP_SORT_CACHE , bool> sort(bool a = false)
+CSP::csp_chan<t_in, t_in, CSP_SORT_CACHE , bool> sort(bool a = false)
 {
-	return CSP::csp_pipe_create<
+	return CSP::csp_chan_create<
 			t_in, t_in, sort_t_<t_in>, CSP_SORT_CACHE , bool>(a);
 }/* sort */
 
@@ -93,7 +93,7 @@ CSP_DECL(grab, std::string, std::string, std::string, bool)
  * Works well with sort
  * Only removes adjacent equal lines
  */
-template <typename t_in> class uniq_t : public CSP::csp_pipe<t_in,t_in>
+template <typename t_in> class uniq_t : public CSP::csp_chan<t_in,t_in>
 {
 public:
 	void run()
@@ -111,9 +111,9 @@ public:
 		}
 	}
 };
-template <typename t_in> CSP::csp_pipe<t_in, t_in> uniq()
+template <typename t_in> CSP::csp_chan<t_in, t_in> uniq()
 {
-	return CSP::csp_pipe_create<
+	return CSP::csp_chan_create<
 			t_in, t_in, uniq_t<t_in>>();
 }/* uniq */
 
@@ -143,7 +143,7 @@ CSP_DECL(print_log, std::string, CSP::nothing)()
 #define CSP_CAT_CACHE 512
 template <typename t_in>
 class cat_generic : public
-	CSP::csp_pipe<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
+	CSP::csp_chan<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
 {
 public:
 	void run(std::vector<t_in>* kitty)
@@ -153,14 +153,14 @@ public:
 	}
 };
 template <typename t_in>
-CSP::csp_pipe<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
+CSP::csp_chan<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
 		vec(std::vector<t_in>& kitty)
 {
-	csp_pipe<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*> a;
+	csp_chan<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*> a;
 	a.arguments = std::make_tuple(&kitty);
 	// Fun fact: I figured out how to type this line
 	//  due to helpful compiler errors
-	a.start = (void(csp_pipe<CSP::nothing,t_in,CSP_CAT_CACHE,std::vector<t_in>*>::*)
+	a.start = (void(csp_chan<CSP::nothing,t_in,CSP_CAT_CACHE,std::vector<t_in>*>::*)
 			(std::vector<t_in>*))&cat_generic<t_in>::run;
 
 	return a;
@@ -172,15 +172,15 @@ CSP::csp_pipe<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
  * cat(file) | pipe_read<...>...
  */
 template <typename t_in, typename t_out>
-class pipe_read_t : public CSP::csp_pipe<
+class pipe_read_t : public CSP::csp_chan<
 		t_in, t_out, CSP_CACHE_DEFAULT,
-		std::function<void(CSP::csp_pipe<t_in, t_out>*, t_in&)>>
+		std::function<void(CSP::csp_chan<t_in, t_out>*, t_in&)>>
 {
 public:
 	// This is the type we want to be, a CSP pipe
-	using thistype = CSP::csp_pipe<
+	using thistype = CSP::csp_chan<
 		t_in, t_out, CSP_CACHE_DEFAULT,
-		std::function<void(CSP::csp_pipe<t_in, t_out>*, t_in&)>>;
+		std::function<void(CSP::csp_chan<t_in, t_out>*, t_in&)>>;
 
 	void run(std::function<void(thistype*,t_in&)> a)
 	{
@@ -191,30 +191,30 @@ public:
 };
 
 template <typename t_in, typename t_out>
-CSP::csp_pipe
+CSP::csp_chan
 <
 	t_in,
 	t_out,
 	CSP_CACHE_DEFAULT,
 	std::function
 	<
-		void(CSP::csp_pipe<t_in,t_out>*, t_in&)
+		void(CSP::csp_chan<t_in,t_out>*, t_in&)
 	>
 >
 	pipe_read(
-		std::function<void(CSP::csp_pipe<t_in, t_out>*, t_in&)>
+		std::function<void(CSP::csp_chan<t_in, t_out>*, t_in&)>
 					asdf)
 {
 	// madotsuki_eating_soup.jpg
-	using thistype = CSP::csp_pipe<
+	using thistype = CSP::csp_chan<
 		t_in, t_out, CSP_CACHE_DEFAULT,
-		std::function<void(CSP::csp_pipe<t_in, t_out>*, t_in&)>>;
+		std::function<void(CSP::csp_chan<t_in, t_out>*, t_in&)>>;
 
 	thistype result;
 
 	result.arguments = std::make_tuple(asdf);
 	result.start = (void (thistype::*)
-					(std::function<void(CSP::csp_pipe<t_in,t_out>*,t_in&)>)
+					(std::function<void(CSP::csp_chan<t_in,t_out>*,t_in&)>)
 		)&pipe_read_t<t_in,t_out>::run;
 
 	return result;
@@ -222,7 +222,7 @@ CSP::csp_pipe
 
 }; /* namespace CSP */
 #define CSP_read(typein,typeout,varname) pipe_read<typein,typeout>(\
-		[](CSP::csp_pipe<typein,typeout>*thisptr, typein varname)
+		[](CSP::csp_chan<typein,typeout>*thisptr, typein varname)
 
 
 #endif /* CSPLIB_H_ */

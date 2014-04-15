@@ -26,9 +26,9 @@ template<typename T> struct is_nothing { static const bool value = false; };
 template<> struct is_nothing<nothing> { static const bool value = true; };
 
 template <typename t_in, typename t_out, int cachesiz = 64, typename... t_args>
-class csp_pipe
+class csp_chan
 {
-	using this_pipe = csp_pipe<t_in,t_out,cachesiz,t_args...>;
+	using this_pipe = csp_chan<t_in,t_out,cachesiz,t_args...>;
 private:
 	// Wait to write till this is filled
 	std::array<t_out, cachesiz> cache_write;
@@ -58,7 +58,7 @@ public:
 	// Specifically fixes pipe_read
 	std::tuple <t_args...> arguments;
 
-	csp_pipe()
+	csp_chan()
 	{
 		background = false;
 		cache_write_head = 0;
@@ -70,7 +70,7 @@ public:
 		next_node_lock = NULL;
 	}
 	// Wait to finish first, then exit to self-destruct
-	~csp_pipe()
+	~csp_chan()
 	{
 		if (background)
 			worker.join();
@@ -121,7 +121,7 @@ public:
 
 	// Copy constructor, won't compile without this
 	// Needed for csp_create...
-	csp_pipe(const csp_pipe& src)
+	csp_chan(const csp_chan& src)
 	{
 		csp_input = src.csp_input;
 		cache_write_head = src.cache_write_head;
@@ -155,8 +155,8 @@ public:
 
 		// Create a tuple with the this pointer and arguments together
 		// Works with the tuple expander call function easily
-		std::tuple<csp_pipe*> head (this);
-		std::tuple<csp_pipe*, t_args...> thisargs =
+		std::tuple<csp_chan*> head (this);
+		std::tuple<csp_chan*, t_args...> thisargs =
 				std::tuple_cat(head, arguments);
 		call(do_start_actually, thisargs);
 
@@ -181,8 +181,8 @@ private:
 public:
 	// The pipe | operator
 	template <typename ot_in,typename ot_out,int ocachesiz,typename...ot_args>
-	csp_pipe<ot_in, ot_out, ocachesiz, ot_args...>&
-		operator |(csp_pipe<ot_in,ot_out,ocachesiz,ot_args...>&& pipe)
+	csp_chan<ot_in, ot_out, ocachesiz, ot_args...>&
+		operator |(csp_chan<ot_in,ot_out,ocachesiz,ot_args...>&& pipe)
 	{
 		// this = left, pipe = right
 		background = true;
@@ -232,14 +232,14 @@ private:
 
 template <typename t_in, typename t_out, typename holder, int cachesiz = 64,
 		typename... t_args>
-static csp_pipe<t_in, t_out, cachesiz, t_args...>
-		csp_pipe_create(t_args... args)
+static csp_chan<t_in, t_out, cachesiz, t_args...>
+		csp_chan_create(t_args... args)
 {
-	csp_pipe<t_in, t_out, cachesiz, t_args...> a;
+	csp_chan<t_in, t_out, cachesiz, t_args...> a;
 	a.arguments = std::make_tuple(args...);
 	// Fun fact: I figured out how to type this line
 	//  due to helpful compiler errors
-	a.start = (void(csp_pipe<t_in,t_out,cachesiz,t_args...>::*)
+	a.start = (void(csp_chan<t_in,t_out,cachesiz,t_args...>::*)
 												(t_args...))&holder::run;
 	return a;
 }
