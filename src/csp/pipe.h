@@ -10,7 +10,7 @@
 
 #include <vector>
 #include <thread>
-#include <future>
+#include <condition_variable>
 #include <mutex>
 #include <algorithm>
 #include <tr1/tuple>

@@ -47,35 +47,35 @@ CSP_DECL(elementize, string, vector<string>) ()
 			fill_vec_till(result, word.size());
 		result[word.size()-1].push_back(word);
 	}
-	for (auto a : result)
+	for (auto& a : result)
 		put(a);
 }
 
-CSP_DECL(genlist, CSP::nothing, string, int)(int length)
+CSP_DECL(genlist, CSP::nothing, wordpair, int)(int length)
 {
 	if (length == 1)
 		// Return all words length 1
-		for (auto a : dict[0])
-			put(a);
+		for (auto& a : dict[0])
+			put({a, ""});
 	else
 	{
 		genlist(length - 1) |
 			// Read every word genlist sends
-			pipe_read<string,nothing>([this,length]
-			                 (CSP::csp_pipe<string,nothing>*, string shorter)
+			pipe_read<wordpair,nothing>([this,length]
+			                 (CSP::csp_pipe<wordpair,nothing>*, wordpair& shorter)
 			{
 				// Try to get a word that differs in one character
 				// Turn i into si, into sin, sing, sting ,string
-				for (auto longer : dict[length-1])
+				for (auto& longer : dict[length-1])
 				{
 					int difference = 0;
-					for (int i = 0; i < length-1 && difference <= 1; i++)
+					for (int i = 0; i < length && difference <= 1; i++)
 					{
-						if (shorter[i-difference] != longer[i])
+						if (shorter.word[i-difference] != longer[i])
 							difference++;
 					}
 					if (difference <= 1)
-						this->put(longer);
+						this->put({longer, shorter.word + " " + shorter.whatmadeit});
 				}
 			});
 	}
@@ -84,28 +84,13 @@ CSP_DECL(genlist, CSP::nothing, string, int)(int length)
 int main(int argc, const char* argv[])
 {
 	string file = argc > 1? argv[1] : "/usr/share/dict/words";
-	vector<string> strings;
 
-	/*cat(file) //| grab("'", true) | to_lower() | sort<string>(false) |
-			//uniq_str(false) | //elementize() >>= dict;
-			| lambda_read<string,string>([](
-					CSP::csp_pipe<string,string>* thisptr, string n){
-		thisptr->put("HELLO, LAMBDA " + n);
-		std::cout << "CALLING FROM LAMBDATOWN : " + n + "\n";
-	}) >>= strings;*/
-	cat(file) | grab("'",true) >>= strings;
+	cat(file) | grab("'", true) | to_lower() | sort<string>(false) |
+			uniq<string>() | elementize() >>= dict;
 
-	vec<string>(strings) | print();
-
-	for (auto a : strings)
-		std::cout << a << "\n";
-	int i = 0;
-	for (auto len : dict)
-	{
-		i++;
-		for (auto a : len)
-			std::cout << i << " : " << a << "\n";
-	}
-
+	genlist(9) | pipe_read<wordpair,nothing>([](csp_pipe<wordpair,nothing>*, wordpair& pair)
+			{
+				std::cout << pair.word + " " + pair.whatmadeit + "\n";
+			});
 	return 0;
 }

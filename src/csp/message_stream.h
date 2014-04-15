@@ -76,7 +76,7 @@ public:
 	{
 		if (do_lock)
 			lock_write();
-		for (auto b : a) this->push_back(b);
+		for (auto& b : a) this->push_back(b);
 		if (do_lock)
 			unlock_write();
 	}

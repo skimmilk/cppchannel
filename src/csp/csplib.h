@@ -89,30 +89,9 @@ CSP_DECL(grab, std::string, std::string, std::string, bool)
 			put(current_line);
 } // grab
 
-/* uniq
- * Removes duplicates
- * Works well with sort
- */
-CSP_DECL(uniq_str, std::string, std::string, bool)(bool case_insensitive)
-{
-	std::string last, current;
-	while (read(current))
-	{
-		if (!case_insensitive)
-		{
-			if (current != last)
-				put(current);
-		}
-		else
-			if (strcasecmp(current.c_str(), last.c_str()) == 0)
-				put(current);
-
-		last = current;
-	}
-} // uniq
-
 /* Generic uniq
- * Only thing different is that there is no case insensitive comparison
+ * Works well with sort
+ * Only removes adjacent equal lines
  */
 template <typename t_in> class uniq_t : public CSP::csp_pipe<t_in,t_in>
 {
@@ -121,13 +100,13 @@ public:
 	{
 		// First, read one
 		t_in current, last;
-		if (!read(last))
+		if (!this->read(last))
 			return;
-		put(last);
-		while(read(current))
+		this->put(last);
+		while(this->read(current))
 		{
 			if (current != last)
-				put(current);
+				this->put(current);
 			last = current;
 		}
 	}
@@ -169,7 +148,7 @@ class cat_generic : public
 public:
 	void run(std::vector<t_in>* kitty)
 	{
-		for (auto a : *kitty)
+		for (auto& a : *kitty)
 			this->put(a);
 	}
 };
@@ -205,7 +184,6 @@ public:
 
 	void run(std::function<void(thistype*,t_in&)> a)
 	{
-		std::cout << "ABOUT TO CALL LAMBDA!!!\n";
 		t_in line;
 		while (this->read(line))
 			a(this, line);
