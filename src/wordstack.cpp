@@ -61,7 +61,7 @@ CSP_DECL(genlist, CSP::nothing, string, int)(int length)
 	{
 		genlist(length - 1) |
 			// Read every word genlist sends
-			lambda_read<string,nothing>([this,length]
+			pipe_read<string,nothing>([this,length]
 			                 (CSP::csp_pipe<string,nothing>*, string shorter)
 			{
 				// Try to get a word that differs in one character
@@ -94,7 +94,8 @@ int main(int argc, const char* argv[])
 		std::cout << "CALLING FROM LAMBDATOWN : " + n + "\n";
 	}) >>= strings;*/
 	cat(file) | grab("'",true) >>= strings;
-	vec(strings) | print();
+
+	vec<string>(strings) | print();
 
 	for (auto a : strings)
 		std::cout << a << "\n";

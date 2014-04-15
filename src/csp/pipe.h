@@ -40,7 +40,6 @@ private:
 
 public:
 	bool background;
-
 	std::tuple <t_args...> arguments;
 	csp_message_stream <t_in>* csp_input;
 	csp_message_stream <t_out> csp_output;
@@ -51,6 +50,7 @@ public:
 	// uniq gets called first, goes into background immediately
 	// then waits for this lock to unlock so it doesn't read garbage csp_input
 	std::mutex wait_lock;
+	std::mutex* next_node_lock;
 
 	csp_pipe()
 	{
@@ -61,6 +61,7 @@ public:
 
 		// Lock here because constructor gets called first
 		wait_lock.lock();
+		next_node_lock = NULL;
 	}
 	// Wait to finish first, then exit to self-destruct
 	~csp_pipe()
@@ -87,7 +88,7 @@ public:
 	// Nothing to read and is finished
 	bool eof()
 	{
-		return csp_input->size() == 0 && csp_input->finished;
+		return cache_read.size() <= cache_read_head && csp_input->size() == 0 && csp_input->finished;
 	}
 
 	bool read(t_in& input)
@@ -120,6 +121,7 @@ public:
 		cache_write_head = src.cache_write_head;
 		cache_read_head = src.cache_read_head;
 		background = src.background;
+		next_node_lock = src.next_node_lock;
 	}
 	/* DO NOT TOUCH */
 public:
@@ -140,8 +142,11 @@ public:
 	bool do_start()
 	{
 		// If the input is nothing, don't wait lock for input
-		//if (!is_nothing<t_in>::value)
-		//	wait_lock.lock();
+		if (!is_nothing<t_in>::value)
+			wait_lock.lock();
+		if (next_node_lock)
+			next_node_lock->unlock();
+
 		// Create a tuple with the this pointer and arguments together
 		// Works with the tuple expander call function easily
 		std::tuple<csp_pipe*> head (this);
@@ -153,7 +158,7 @@ public:
 		if (!is_nothing<t_out>::value)
 		{
 			csp_output.lock.lock();
-			csp_output.template write<cachesiz>(cache_write, cache_write_head - 1, false);
+			csp_output.template write<cachesiz>(cache_write, cache_write_head, false);
 			csp_output.finished = true;
 			csp_output.lock.unlock();
 			csp_output.antilock.unlock();
@@ -162,7 +167,7 @@ public:
 	}
 private:
 	// Called by worker thread only, runs the runner
-	static void begin_background(csp_pipe* a)
+	static void begin_background(this_pipe* a)
 	{
 		a->do_start();
 	}
@@ -173,7 +178,9 @@ public:
 	csp_pipe<ot_in, ot_out, ocachesiz, ot_args...>&
 		operator |(csp_pipe<ot_in,ot_out,ocachesiz,ot_args...>&& pipe)
 	{
+		// this = left, pipe = right
 		background = true;
+		next_node_lock = &pipe.wait_lock;
 		pipe.background = true;
 		pipe.csp_input = &csp_output;
 
