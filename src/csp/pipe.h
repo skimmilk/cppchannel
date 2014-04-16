@@ -16,8 +16,7 @@
 #include <tr1/tuple>
 #include <atomic>
 
-#include "spaghetti.h"
-#include "message_stream.h"
+#include <csp/message_stream.h>
 
 namespace CSP
 {

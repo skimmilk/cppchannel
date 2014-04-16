@@ -12,7 +12,7 @@
 #include <iostream>
 #include <strings.h>
 
-#include "pipe.h"
+#include <csp/pipe.h>
 
 namespace CSP{
 /* ================================
@@ -50,36 +50,46 @@ CSP_DECL(to_lower, std::string, std::string) ()
  * Sorts stuff
  * Call with sort<yourType>()
  * This is how you have to do templates with pipes
+ * Sorting with heap allows us to sort while receiving input AND output
+ * This optimizes the flow of the pipeline, more operations can happen at once
+ *   push_heap is very fast -- average constant time
+ *     Allows for O(log n) sorting time after input has finished
+ *       (Output is also streamed while sorting)
  * ================================
  */
-#define CSP_SORT_CACHE 512
 template <typename t_in>
-class sort_t_: public CSP::csp_chan<t_in, t_in, CSP_SORT_CACHE , bool>
+class sort_t_: public CSP::csp_chan<t_in, t_in, CSP_CACHE_DEFAULT, bool>
 {
 public:
 	void run(bool reverse)
 	{
 		std::vector<t_in> output;
+		auto functor = reverse? [](t_in& a, t_in&b){ return a < b; }
+					: [](t_in& a, t_in& b){ return a > b; };
+
+		std::make_heap(output.begin(), output.end(), functor);
 		t_in line;
 
-		// why.webm
-		while(this->read(line))
+		while (this->read(line))
+		{
 			output.push_back(line);
+			std::push_heap(output.begin(), output.end(), functor);
+		}
 
-		if (reverse)
-			std::sort(output.begin(), output.end(), std::greater<t_in>());
-		else
-			std::sort(output.begin(), output.end());
-
-		for (auto a : output)
-			this->put(a);
+		//std::sort_heap(output.begin(), output.end(), functor);
+		int siz = output.size();
+		for (int i = 0; i < siz; i++)
+		{
+			this->put(output.front());
+			std::pop_heap(output.begin(), output.end() - i, functor);
+		}
 	}
 };
 template <typename t_in>
-CSP::csp_chan<t_in, t_in, CSP_SORT_CACHE , bool> sort(bool a = false)
+CSP::csp_chan<t_in, t_in, CSP_CACHE_DEFAULT, bool> sort(bool a = false)
 {
 	return CSP::csp_chan_create<
-			t_in, t_in, sort_t_<t_in>, CSP_SORT_CACHE , bool>(a);
+			t_in, t_in, sort_t_<t_in>, CSP_CACHE_DEFAULT, bool>(a);
 }/* sort */
 
 /* ================================
@@ -154,7 +164,9 @@ CSP_DECL(print_log, std::string, CSP::nothing)()
  *  vec(string) | print();
  *  ================================
  */
-#define CSP_CAT_CACHE 512
+// vec has a very fast output
+// To avoid spamming thread locks uselessly, write less often
+#define CSP_CAT_CACHE (CSP_CACHE_DEFAULT*4)
 template <typename t_in>
 class cat_generic : public
 	CSP::csp_chan<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>

@@ -8,6 +8,8 @@
 #ifndef ONEWAY_CHANNEL_H_
 #define ONEWAY_CHANNEL_H_
 
+#include <csp/spaghetti.h>
+
 namespace CSP{
 
 // Typical programming channel

@@ -2,7 +2,7 @@
 #include <string>
 #include <fstream>
 
-#include "csp/csplib.h"
+#include <csp/csplib.h>
 
 using namespace CSP;
 using std::string;
