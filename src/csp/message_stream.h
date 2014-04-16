@@ -18,22 +18,21 @@ namespace CSP{
 template<typename T>
 class csp_message_stream : public std::vector<T>
 {
+private:
+	std::mutex wait_lock_m;
+	// Locked when reading/writing
+	std::mutex flush;
+	std::unique_lock<std::mutex> wait_lock_ml;
 public:
-	// Lock this when reading/writing
-	std::mutex lock;
-	// Lock this to wait for lock to lock...
-	//  i.e. This is a message that lock has been touched
-	std::mutex antilock;
+	// Wait on this for input
+	std::condition_variable wait_lock;
 
 	bool finished;
 
 	csp_message_stream()
 	{
 		finished = false;
-	}
-	~csp_message_stream()
-	{
-		finished = true;
+		wait_lock_ml = std::unique_lock<std::mutex>(wait_lock_m);
 	}
 
 	// Do the actual read, just the read
@@ -41,7 +40,6 @@ public:
 	{
 		int siz = this->size();
 		for (int i = 0; i < siz; i++)
-			//outvec[i] = this->at(i);
 			outvec.push_back(this->at(i));
 	}
 	// Read as much as we can INTO buffer
@@ -49,7 +47,7 @@ public:
 	int read(std::vector<T>& buffer)
 	{
 		retry_read:
-		lock.lock();
+		lock_read();
 		size_t siz = this->size();
 
 		if (finished)
@@ -61,12 +59,14 @@ public:
 			do_read(buffer);
 		else
 		{
+			unlock_read();
 			wait_write();
 			goto retry_read;
 		}
 
 		this->clear();
-		lock.unlock();
+		unlock_read();
+
 		return siz;
 	}
 
@@ -92,28 +92,26 @@ public:
 			unlock_write();
 	}
 
-private:
+	void lock_read()
+	{
+		flush.lock();
+	}
+	void unlock_read()
+	{
+		flush.unlock();
+	}
 	void lock_write()
 	{
-		lock.lock();
+		flush.lock();
 	}
 	void unlock_write()
 	{
-		lock.unlock();
-		antilock.unlock();
+		flush.unlock();
+		wait_lock.notify_all();
 	}
 	void wait_write()
 	{
-		// Double lock ensures we'll wait till unlock_write gets called
-		// Not the best way to do this, but safe enough
-		lock.unlock();
-		// Flow gets stopped for sure here, and will continue
-		//  once antiLock gets unlocked
-		// Make sure this doesn't double-wait-lock on this
-		if (antilock.try_lock())
-			antilock.lock();
-		else
-			antilock.lock();
+		wait_lock.wait(wait_lock_ml);
 	}
 };
 

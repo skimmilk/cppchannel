@@ -14,6 +14,7 @@
 #include <mutex>
 #include <algorithm>
 #include <tr1/tuple>
+#include <atomic>
 
 #include "spaghetti.h"
 #include "message_stream.h"
@@ -43,14 +44,6 @@ public:
 	csp_message_stream <t_in>* csp_input;
 	csp_message_stream <t_out> csp_output;
 
-	// Locked till left-hand side has initialized
-	// stuff evaluates left-to-right, so
-	// cat(stuff) | sort() | uniq()
-	// uniq gets called first, goes into background immediately
-	// then waits for this lock to unlock so it doesn't read garbage csp_input
-	std::mutex wait_lock;
-	std::mutex* next_node_lock;
-
 	// Variable length...
 	// Putting this last allows for self-referential pipes to be called
 	//   through a pointer without knowing the size of the member to align
@@ -64,16 +57,13 @@ public:
 		cache_write_head = 0;
 		csp_input = 0;
 		cache_read_head = 0;
-
-		// Lock here because constructor gets called first
-		wait_lock.lock();
-		next_node_lock = NULL;
 	}
 	// Wait to finish first, then exit to self-destruct
 	~csp_chan()
 	{
 		if (background)
 			worker.join();
+		csp_output.finished = true;
 	}
 
 	void flush_cache()
@@ -127,7 +117,6 @@ public:
 		cache_write_head = src.cache_write_head;
 		cache_read_head = src.cache_read_head;
 		background = src.background;
-		next_node_lock = src.next_node_lock;
 	}
 	/* DO NOT TOUCH */
 public:
@@ -147,12 +136,6 @@ public:
 	// Starting point to finally do all the work
 	bool do_start()
 	{
-		// If the input is nothing, don't wait lock for input
-		if (!is_nothing<t_in>::value)
-			wait_lock.lock();
-		if (next_node_lock)
-			next_node_lock->unlock();
-
 		// Create a tuple with the this pointer and arguments together
 		// Works with the tuple expander call function easily
 		std::tuple<csp_chan*> head (this);
@@ -163,11 +146,10 @@ public:
 		// Clean up
 		if (!is_nothing<t_out>::value)
 		{
-			csp_output.lock.lock();
+			csp_output.lock_write();
 			csp_output.template write<cachesiz>(cache_write, cache_write_head, false);
 			csp_output.finished = true;
-			csp_output.lock.unlock();
-			csp_output.antilock.unlock();
+			csp_output.unlock_write();
 		}
 		return true;
 	}
@@ -186,7 +168,6 @@ public:
 	{
 		// this = left, pipe = right
 		background = true;
-		next_node_lock = &pipe.wait_lock;
 		pipe.background = true;
 		pipe.csp_input = &csp_output;
 
@@ -219,15 +200,6 @@ public:
 		out = csp_output;
 		return *this;
 	}
-
-	// Force the calling thread to block on this
-	//  instead of going into the background
-	// Not sure how to implement this
-private:
-	this_pipe& block()
-	{
-		return *this;
-	}
 };
 
 template <typename t_in, typename t_out, typename holder, int cachesiz = 64,
@@ -235,12 +207,13 @@ template <typename t_in, typename t_out, typename holder, int cachesiz = 64,
 static csp_chan<t_in, t_out, cachesiz, t_args...>
 		csp_chan_create(t_args... args)
 {
-	csp_chan<t_in, t_out, cachesiz, t_args...> a;
+	using this_pipe = csp_chan<t_in,t_out,cachesiz,t_args...>;
+
+	this_pipe a;
 	a.arguments = std::make_tuple(args...);
 	// Fun fact: I figured out how to type this line
 	//  due to helpful compiler errors
-	a.start = (void(csp_chan<t_in,t_out,cachesiz,t_args...>::*)
-												(t_args...))&holder::run;
+	a.start = (void(this_pipe::*)(t_args...))&holder::run;
 	return a;
 }
 

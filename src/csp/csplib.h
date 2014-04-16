@@ -15,9 +15,11 @@
 #include "pipe.h"
 
 namespace CSP{
-/* cat
+/* ================================
+ * cat
  * Writes a file out line by line
  * Pipes that get called with no input __MUST__ have CSP::nothing as input
+ * ================================
  */
 //       name     input       output     arguments     (arguments)
 CSP_DECL(cat, CSP::nothing, std::string, std::string) (std::string file)
@@ -28,8 +30,10 @@ CSP_DECL(cat, CSP::nothing, std::string, std::string) (std::string file)
 		put(line);
 } // cat
 
-/* to_lower
+/* ================================
+ * to_lower
  * Outputs input, but in lower case
+ * ================================
  */
 CSP_DECL(to_lower, std::string, std::string) ()
 {
@@ -41,10 +45,12 @@ CSP_DECL(to_lower, std::string, std::string) ()
 	}
 }// to_lower
 
-/* sort
+/* ================================
+ * sort
  * Sorts stuff
  * Call with sort<yourType>()
  * This is how you have to do templates with pipes
+ * ================================
  */
 #define CSP_SORT_CACHE 512
 template <typename t_in>
@@ -76,8 +82,10 @@ CSP::csp_chan<t_in, t_in, CSP_SORT_CACHE , bool> sort(bool a = false)
 			t_in, t_in, sort_t_<t_in>, CSP_SORT_CACHE , bool>(a);
 }/* sort */
 
-/* grab
+/* ================================
+ * grab
  * Writes out strings that contain the specified string
+ * ================================
  */
 CSP_DECL(grab, std::string, std::string, std::string, bool)
 								(std::string search, bool invert)
@@ -89,9 +97,11 @@ CSP_DECL(grab, std::string, std::string, std::string, bool)
 			put(current_line);
 } // grab
 
-/* Generic uniq
+/* ================================
+ * Generic uniq
  * Works well with sort
- * Only removes adjacent equal lines
+ * Only removes adjacent equivalent lines
+ * ================================
  */
 template <typename t_in> class uniq_t : public CSP::csp_chan<t_in,t_in>
 {
@@ -117,8 +127,10 @@ template <typename t_in> CSP::csp_chan<t_in, t_in> uniq()
 			t_in, t_in, uniq_t<t_in>>();
 }/* uniq */
 
-/* print
+/* ================================
+ * print
  * Prints input stream to stdout
+ * ================================
  */
 CSP_DECL(print, std::string, CSP::nothing)()
 {
@@ -134,11 +146,13 @@ CSP_DECL(print_log, std::string, CSP::nothing)()
 		std::cerr << line + "\n";
 } // print_log
 
-/* vec
+/* ================================
+ * vec
  * Sends out items in a vector over a pipe
  *  vector<string> a;
  *  ...
  *  vec(string) | print();
+ *  ================================
  */
 #define CSP_CAT_CACHE 512
 template <typename t_in>
@@ -167,9 +181,11 @@ CSP::csp_chan<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
 
 }/* vec */
 
-/* chan_read
+/* ================================
+ * chan_read
  * Iterate over a pipe in-line
  * cat(file) | chan_read<...>...
+ * ================================
  */
 template <typename t_in, typename t_out>
 class chan_read_t : public CSP::csp_chan<
@@ -220,9 +236,61 @@ CSP::csp_chan
 	return result;
 } // chan_read
 
-}; /* namespace CSP */
-#define CSP_read(typein,typeout,varname) chan_read<typein,typeout>(\
-		[](CSP::csp_chan<typein,typeout>*thisptr, typein varname)
+/* ================================
+ * chan_read
+ * its chan_read without sending thisptr
+ * (can't use thisptr->put() -- thus no output)
+ * ================================
+ */
+template <typename t_in>
+class chan_sans_output_read_t : public CSP::csp_chan<
+		t_in, CSP::nothing, CSP_CACHE_DEFAULT,
+		std::function<void(t_in&)>>
+{
+public:
+	// This is the type we want to be, a CSP pipe
+	using thistype = CSP::csp_chan<
+		t_in, CSP::nothing, CSP_CACHE_DEFAULT,
+		std::function<void(t_in&)>>;
 
+	void run(std::function<void(t_in&)> a)
+	{
+		t_in line;
+		while (this->read(line))
+			a(line);
+	}
+};
+template <typename t_in>
+CSP::csp_chan
+<
+	t_in,
+	CSP::nothing,
+	CSP_CACHE_DEFAULT,
+	std::function
+	<
+		void(t_in&)
+	>
+>
+	chan_read(
+		std::function<void(t_in&)>
+					asdf)
+{
+	// madotsuki_eating_soup.jpg
+	using thistype = CSP::csp_chan<
+		t_in, CSP::nothing, CSP_CACHE_DEFAULT,
+		std::function<void(t_in&)>>;
+
+	thistype result;
+
+	result.arguments = std::make_tuple(asdf);
+	result.start = (void (thistype::*)
+					(std::function<void(t_in&)>)
+		)&chan_sans_output_read_t<t_in>::run;
+
+	return result;
+} // chan_read
+
+
+}; /* namespace CSP */
 
 #endif /* CSPLIB_H_ */
