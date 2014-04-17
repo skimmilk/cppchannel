@@ -13,6 +13,7 @@
 #include <strings.h>
 
 #include <csp/pipe.h>
+#include <csp/read.h>
 
 namespace CSP{
 /* ================================
@@ -186,122 +187,13 @@ CSP::csp_chan<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
 	a.arguments = std::make_tuple(&kitty);
 	// Fun fact: I figured out how to type this line
 	//  due to helpful compiler errors
-	a.start = (void(csp_chan<CSP::nothing,t_in,CSP_CAT_CACHE,std::vector<t_in>*>::*)
-			(std::vector<t_in>*))&cat_generic<t_in>::run;
+	a.start = (void(
+			csp_chan<CSP::nothing,t_in,CSP_CAT_CACHE,std::vector<t_in>*>::*)
+		(std::vector<t_in>*))&cat_generic<t_in>::run;
 
 	return a;
 
 }/* vec */
-
-/* ================================
- * chan_read
- * Iterate over a pipe in-line
- * cat(file) | chan_read<...>...
- * ================================
- */
-template <typename t_in, typename t_out>
-class chan_read_t : public CSP::csp_chan<
-		t_in, t_out, CSP_CACHE_DEFAULT,
-		std::function<void(CSP::csp_chan<t_in, t_out>*, t_in&)>>
-{
-public:
-	// This is the type we want to be, a CSP pipe
-	using thistype = CSP::csp_chan<
-		t_in, t_out, CSP_CACHE_DEFAULT,
-		std::function<void(CSP::csp_chan<t_in, t_out>*, t_in&)>>;
-
-	void run(std::function<void(thistype*,t_in&)> a)
-	{
-		t_in line;
-		while (this->read(line))
-			a(this, line);
-	}
-};
-
-template <typename t_in, typename t_out>
-CSP::csp_chan
-<
-	t_in,
-	t_out,
-	CSP_CACHE_DEFAULT,
-	std::function
-	<
-		void(CSP::csp_chan<t_in,t_out>*, t_in&)
-	>
->
-	chan_read(
-		std::function<void(CSP::csp_chan<t_in, t_out>*, t_in&)>
-					asdf)
-{
-	// madotsuki_eating_soup.jpg
-	using thistype = CSP::csp_chan<
-		t_in, t_out, CSP_CACHE_DEFAULT,
-		std::function<void(CSP::csp_chan<t_in, t_out>*, t_in&)>>;
-
-	thistype result;
-
-	result.arguments = std::make_tuple(asdf);
-	result.start = (void (thistype::*)
-					(std::function<void(CSP::csp_chan<t_in,t_out>*,t_in&)>)
-		)&chan_read_t<t_in,t_out>::run;
-
-	return result;
-} // chan_read
-
-/* ================================
- * chan_read
- * its chan_read without sending thisptr
- * (can't use thisptr->put() -- thus no output)
- * ================================
- */
-template <typename t_in>
-class chan_sans_output_read_t : public CSP::csp_chan<
-		t_in, CSP::nothing, CSP_CACHE_DEFAULT,
-		std::function<void(t_in&)>>
-{
-public:
-	// This is the type we want to be, a CSP pipe
-	using thistype = CSP::csp_chan<
-		t_in, CSP::nothing, CSP_CACHE_DEFAULT,
-		std::function<void(t_in&)>>;
-
-	void run(std::function<void(t_in&)> a)
-	{
-		t_in line;
-		while (this->read(line))
-			a(line);
-	}
-};
-template <typename t_in>
-CSP::csp_chan
-<
-	t_in,
-	CSP::nothing,
-	CSP_CACHE_DEFAULT,
-	std::function
-	<
-		void(t_in&)
-	>
->
-	chan_read(
-		std::function<void(t_in&)>
-					asdf)
-{
-	// madotsuki_eating_soup.jpg
-	using thistype = CSP::csp_chan<
-		t_in, CSP::nothing, CSP_CACHE_DEFAULT,
-		std::function<void(t_in&)>>;
-
-	thistype result;
-
-	result.arguments = std::make_tuple(asdf);
-	result.start = (void (thistype::*)
-					(std::function<void(t_in&)>)
-		)&chan_sans_output_read_t<t_in>::run;
-
-	return result;
-} // chan_read
-
 
 }; /* namespace CSP */
 

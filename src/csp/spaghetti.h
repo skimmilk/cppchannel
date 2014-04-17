@@ -32,6 +32,7 @@ void _##fn_name##_t_ ::run
 
 // jesus christ how horrifying
 
+// http://stackoverflow.com/questions/10766112/c11-i-can-go-from-multiple-args-to-tuple-but-can-i-go-from-tuple-to-multiple
 // implementation details, users never invoke these directly
 namespace detail
 {

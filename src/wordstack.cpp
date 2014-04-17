@@ -74,9 +74,12 @@ int main(int argc, const char* argv[])
 	cat(file) | grab("'", true) | to_lower() | sort<string>(false) |
 			uniq<string>() | elementize() >>= dict;
 
-	genlist(9) | chan_read<wordpair>([](wordpair& pair)
+	genlist(9) |
+			chan_select<wordpair,string>(
+					[](wordpair& s)
 			{
-				std::cout << pair.word + " " + pair.whatmadeit + "\n";
-			});
+				return s.word + " " + s.whatmadeit;
+			})
+				| sort<string>(false) | uniq<string>() | print();
 	return 0;
 }
