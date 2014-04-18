@@ -18,14 +18,14 @@ namespace CSP{
  * ================================================================
  */
 template <typename t_in>
-class chan_select_t : public CSP::csp_chan<
+class chan_select_t : public CSP::channel<
 		t_in, t_in, CSP_CACHE_DEFAULT,
 		std::function<bool(t_in&)>>
 {
 public:
 	using funkname = std::function<bool(t_in&)>;
 	// This is the type we want to be, a CSP pipe
-	using thistype = CSP::csp_chan<
+	using thistype = CSP::channel<
 		t_in, t_in, CSP_CACHE_DEFAULT,
 		funkname>;
 
@@ -36,9 +36,9 @@ public:
 			if(a(line))	this->put(line);
 	}
 };
-// csp_chan functor
+// channel functor
 template <typename t_in>
-CSP::csp_chan
+CSP::channel
 <
 	t_in,
 	t_in,
@@ -50,7 +50,7 @@ CSP::csp_chan
 					asdf)
 {
 	using funkname = std::function<bool(t_in&)>;
-	using thistype = CSP::csp_chan<
+	using thistype = CSP::channel<
 		t_in, t_in, CSP_CACHE_DEFAULT,
 		funkname>;
 	thistype result;
@@ -69,14 +69,14 @@ CSP::csp_chan
  * ================================================================
  */
 template <typename t_in, typename t_out>
-class chan_readwrite_t : public CSP::csp_chan<
+class chan_readwrite_t : public CSP::channel<
 		t_in, t_out, CSP_CACHE_DEFAULT,
-		std::function<void(CSP::csp_chan<t_in,t_out>*, t_in&)>>
+		std::function<void(CSP::channel<t_in,t_out>*, t_in&)>>
 {
 public:
-	using funkname = std::function<void(CSP::csp_chan<t_in,t_out>*, t_in&)>;
+	using funkname = std::function<void(CSP::channel<t_in,t_out>*, t_in&)>;
 	// This is the type we want to be, a CSP pipe
-	using thistype = CSP::csp_chan<
+	using thistype = CSP::channel<
 		t_in, t_out, CSP_CACHE_DEFAULT,
 		funkname>;
 
@@ -87,9 +87,9 @@ public:
 			a(this, line);
 	}
 };
-// csp_chan functor
+// channel functor
 template <typename t_in, typename t_out>
-CSP::csp_chan
+CSP::channel
 <
 	t_in,
 	t_out,
@@ -97,12 +97,12 @@ CSP::csp_chan
 	std::function<void(t_in&)>
 >
 	chan_readwrite(
-		std::function<void(CSP::csp_chan<t_in,t_out>*, t_in&)>
+		std::function<void(CSP::channel<t_in,t_out>*, t_in&)>
 					asdf)
 {
-	using funkname = std::function<void(CSP::csp_chan<t_in,t_out>*, t_in&)>;
+	using funkname = std::function<void(CSP::channel<t_in,t_out>*, t_in&)>;
 	// madotsuki_eating_soup.jpg
-	using thistype = CSP::csp_chan<
+	using thistype = CSP::channel<
 		t_in, t_out, CSP_CACHE_DEFAULT,
 		funkname>;
 
@@ -123,14 +123,14 @@ CSP::csp_chan
  * ================================================================
  */
 template <typename t_in, typename t_out>
-class chan_iter_t : public CSP::csp_chan<
+class chan_iter_t : public CSP::channel<
 		t_in, t_out, CSP_CACHE_DEFAULT,
 		std::function<t_out(t_in&)>>
 {
 public:
 	using funkname = std::function<t_out(t_in&)>;
 	// This is the type we want to be, a CSP pipe
-	using thistype = CSP::csp_chan<
+	using thistype = CSP::channel<
 		t_in, t_out, CSP_CACHE_DEFAULT,
 		funkname>;
 
@@ -141,9 +141,9 @@ public:
 			this->put(a(line));
 	}
 };
-// csp_chan functor
+// channel functor
 template <typename t_in, typename t_out>
-CSP::csp_chan
+CSP::channel
 <
 	t_in,
 	t_out,
@@ -156,7 +156,7 @@ CSP::csp_chan
 {
 	using funkname = std::function<t_out(t_in&)>;
 	// madotsuki_eating_soup.jpg
-	using thistype = CSP::csp_chan<
+	using thistype = CSP::channel<
 		t_in, t_out, CSP_CACHE_DEFAULT,
 		funkname>;
 
@@ -178,13 +178,13 @@ CSP::csp_chan
  * ================================================================
  */
 template <typename t_in>
-class chan_sans_output_read_t : public CSP::csp_chan<
+class chan_sans_output_read_t : public CSP::channel<
 		t_in, CSP::nothing, CSP_CACHE_DEFAULT,
 		std::function<void(t_in&)>>
 {
 public:
 	// This is the type we want to be, a CSP pipe
-	using thistype = CSP::csp_chan<
+	using thistype = CSP::channel<
 		t_in, CSP::nothing, CSP_CACHE_DEFAULT,
 		std::function<void(t_in&)>>;
 
@@ -195,9 +195,9 @@ public:
 			a(line);
 	}
 };
-// csp_chan functor
+// channel functor
 template <typename t_in>
-CSP::csp_chan
+CSP::channel
 <
 	t_in,
 	CSP::nothing,
@@ -210,7 +210,7 @@ CSP::csp_chan
 {
 	// madotsuki_eating_soup.jpg
 	using funkname = std::function<void(t_in&)>;
-	using thistype = CSP::csp_chan<
+	using thistype = CSP::channel<
 		t_in, CSP::nothing, CSP_CACHE_DEFAULT,
 		funkname>;
 

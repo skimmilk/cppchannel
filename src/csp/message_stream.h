@@ -22,7 +22,7 @@ namespace CSP{
 // Cache isn't implemented here because it would require the holder
 //  of input and output channels to know the cache sizes of each other
 template<typename T>
-class csp_message_stream : public std::vector<T>
+class message_stream : public std::vector<T>
 {
 private:
 	std::mutex wait_lock_m;
@@ -35,7 +35,7 @@ public:
 
 	bool finished;
 
-	csp_message_stream()
+	message_stream()
 	{
 		finished = false;
 		wait_lock_ml = std::unique_lock<std::mutex>(wait_lock_m);

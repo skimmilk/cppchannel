@@ -2,23 +2,23 @@
 
 #define CSP_DECL_CONTAINER(fn_name, input, output,cache, ...)\
 	class _##fn_name##_t_ : public\
-			CSP::csp_chan<input,output,cache,##__VA_ARGS__>\
+			CSP::channel<input,output,cache,##__VA_ARGS__>\
 	{\
 	public:\
 		void run(__VA_ARGS__);\
 	};
 /*template <typename t_in>
-CSP::csp_chan<t_in, t_in, CSP_CACHE_DEFAULT, bool> sort(bool a = false)
-	return CSP::csp_chan_create<t_in, t_in, sort_t_<t_in>, CSP_CACHE_DEFAULT, bool>(a);*/
+CSP::channel<t_in, t_in, CSP_CACHE_DEFAULT, bool> sort(bool a = false)
+	return CSP::chan_create<t_in, t_in, sort_t_<t_in>, CSP_CACHE_DEFAULT, bool>(a);*/
 
 
 #define CSP_DECL_TEMPL_INIT(fn_name,templed_name,input,output,cache,...)\
-	CSP::csp_chan<input,output,cache,##__VA_ARGS__> (*fn_name)(__VA_ARGS__) =\
-	CSP::csp_chan_create<input,output,templed_name,cache,##__VA_ARGS__>;
+	CSP::channel<input,output,cache,##__VA_ARGS__> (*fn_name)(__VA_ARGS__) =\
+	CSP::chan_create<input,output,templed_name,cache,##__VA_ARGS__>;
 
 #define CSP_DECL_INITIALIZER(fn_name,input,output,cache,...)\
-	CSP::csp_chan<input,output,cache,##__VA_ARGS__> (*fn_name)(__VA_ARGS__) =\
-	CSP::csp_chan_create<input,output,_##fn_name##_t_,cache,##__VA_ARGS__>;
+	CSP::channel<input,output,cache,##__VA_ARGS__> (*fn_name)(__VA_ARGS__) =\
+	CSP::chan_create<input,output,_##fn_name##_t_,cache,##__VA_ARGS__>;
 
 #define CSP_DECLC(fn_name,input,output,cache,...)\
 	CSP_DECL_CONTAINER(fn_name,input,output,cache,##__VA_ARGS__)\

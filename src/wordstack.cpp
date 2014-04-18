@@ -3,6 +3,7 @@
 #include <fstream>
 
 #include <csp/csplib.h>
+#include <csp/parallel.h>
 
 using namespace CSP;
 using std::string;
@@ -71,7 +72,7 @@ int main(int argc, const char* argv[])
 {
 	string file = argc > 1? argv[1] : "/usr/share/dict/words";
 
-	cat(file) | grab("'", true) | to_lower() | sort<string>(false) |
+	cat(file) | grab("'", true) | to_lower() | sort<string>() |
 			uniq<string>() | elementize() >>= dict;
 
 	genlist(9) |
@@ -80,6 +81,6 @@ int main(int argc, const char* argv[])
 			{
 				return s.word + " " + s.whatmadeit;
 			})
-				| sort<string>(false) | print();
+				| sort<string>() | print();
 	return 0;
 }

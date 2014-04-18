@@ -59,7 +59,7 @@ CSP_DECL(to_lower, std::string, std::string) ()
  * ================================
  */
 template <typename t_in>
-class sort_t_: public CSP::csp_chan<t_in, t_in, CSP_CACHE_DEFAULT, bool>
+class sort_t_: public CSP::channel<t_in, t_in, CSP_CACHE_DEFAULT, bool>
 {
 public:
 	void run(bool reverse)
@@ -77,7 +77,6 @@ public:
 			std::push_heap(output.begin(), output.end(), functor);
 		}
 
-		//std::sort_heap(output.begin(), output.end(), functor);
 		int siz = output.size();
 		for (int i = 0; i < siz; i++)
 		{
@@ -87,9 +86,9 @@ public:
 	}
 };
 template <typename t_in>
-CSP::csp_chan<t_in, t_in, CSP_CACHE_DEFAULT, bool> sort(bool a = false)
+CSP::channel<t_in, t_in, CSP_CACHE_DEFAULT, bool> sort(bool a = false)
 {
-	return CSP::csp_chan_create<
+	return CSP::chan_create<
 			t_in, t_in, sort_t_<t_in>, CSP_CACHE_DEFAULT, bool>(a);
 }/* sort */
 
@@ -114,7 +113,7 @@ CSP_DECL(grab, std::string, std::string, std::string, bool)
  * Only removes adjacent equivalent lines
  * ================================
  */
-template <typename t_in> class uniq_t : public CSP::csp_chan<t_in,t_in>
+template <typename t_in> class uniq_t : public CSP::channel<t_in,t_in>
 {
 public:
 	void run()
@@ -132,9 +131,9 @@ public:
 		}
 	}
 };
-template <typename t_in> CSP::csp_chan<t_in, t_in> uniq()
+template <typename t_in> CSP::channel<t_in, t_in> uniq()
 {
-	return CSP::csp_chan_create<
+	return CSP::chan_create<
 			t_in, t_in, uniq_t<t_in>>();
 }/* uniq */
 
@@ -170,7 +169,7 @@ CSP_DECL(print_log, std::string, CSP::nothing)()
 #define CSP_CAT_CACHE (CSP_CACHE_DEFAULT*4)
 template <typename t_in>
 class cat_generic : public
-	CSP::csp_chan<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
+	CSP::channel<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
 {
 public:
 	void run(std::vector<t_in>* kitty)
@@ -180,15 +179,15 @@ public:
 	}
 };
 template <typename t_in>
-CSP::csp_chan<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
+CSP::channel<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
 		vec(std::vector<t_in>& kitty)
 {
-	csp_chan<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*> a;
+	channel<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*> a;
 	a.arguments = std::make_tuple(&kitty);
 	// Fun fact: I figured out how to type this line
 	//  due to helpful compiler errors
 	a.start = (void(
-			csp_chan<CSP::nothing,t_in,CSP_CAT_CACHE,std::vector<t_in>*>::*)
+			channel<CSP::nothing,t_in,CSP_CAT_CACHE,std::vector<t_in>*>::*)
 		(std::vector<t_in>*))&cat_generic<t_in>::run;
 
 	return a;
