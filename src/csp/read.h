@@ -13,6 +13,56 @@
 namespace CSP{
 
 /* ================================================================
+ * chan_select
+ * Only output input when the overloaded function returns true
+ * ================================================================
+ */
+template <typename t_in>
+class chan_select_t : public CSP::csp_chan<
+		t_in, t_in, CSP_CACHE_DEFAULT,
+		std::function<bool(t_in&)>>
+{
+public:
+	using funkname = std::function<bool(t_in&)>;
+	// This is the type we want to be, a CSP pipe
+	using thistype = CSP::csp_chan<
+		t_in, t_in, CSP_CACHE_DEFAULT,
+		funkname>;
+
+	void run(funkname a)
+	{
+		t_in line;
+		while (this->read(line))
+			if(a(line))	this->put(line);
+	}
+};
+// csp_chan functor
+template <typename t_in>
+CSP::csp_chan
+<
+	t_in,
+	t_in,
+	CSP_CACHE_DEFAULT,
+	std::function<bool(t_in&)>
+>
+	chan_readwrite(
+		std::function<bool(t_in&)>
+					asdf)
+{
+	using funkname = std::function<bool(t_in&)>;
+	using thistype = CSP::csp_chan<
+		t_in, t_in, CSP_CACHE_DEFAULT,
+		funkname>;
+	thistype result;
+
+	result.arguments = std::make_tuple(asdf);
+	result.start = (void(thistype::*)(funkname))
+			&chan_select_t<t_in>::run;
+
+	return result;
+} // chan_select
+
+/* ================================================================
  * chan_readwrite
  * Iterate over a pipe in-line, selectively output
  * cat(file) | chan_read<...>...
@@ -67,13 +117,13 @@ CSP::csp_chan
 
 
 /* ================================================================
- * chan_select
+ * chan_iter
  * Iterate over a pipe in-line, always output
  * cat(file) | chan_read<...>...
  * ================================================================
  */
 template <typename t_in, typename t_out>
-class chan_select_t : public CSP::csp_chan<
+class chan_iter_t : public CSP::csp_chan<
 		t_in, t_out, CSP_CACHE_DEFAULT,
 		std::function<t_out(t_in&)>>
 {
@@ -100,7 +150,7 @@ CSP::csp_chan
 	CSP_CACHE_DEFAULT,
 	std::function<t_out(t_in&)>
 >
-	chan_select(
+	chan_iter(
 		std::function<t_out(t_in&)>
 					asdf)
 {
@@ -114,7 +164,7 @@ CSP::csp_chan
 
 	result.arguments = std::make_tuple(asdf);
 	result.start = (void(thistype::*)(funkname))
-			&chan_select_t<t_in,t_out>::run;
+			&chan_iter_t<t_in,t_out>::run;
 
 	return result;
 } // chan_read
@@ -122,6 +172,7 @@ CSP::csp_chan
 
 /* ================================================================
  * chan_read
+ * Non-outputting read
  * its chan_read without sending thisptr
  * (can't use thisptr->put() -- thus no output)
  * ================================================================

@@ -8,6 +8,10 @@
 #ifndef ONEWAY_CHANNEL_H_
 #define ONEWAY_CHANNEL_H_
 
+#include <mutex>
+#include <condition_variable>
+#include <vector>
+
 #include <csp/spaghetti.h>
 
 namespace CSP{
@@ -74,7 +78,7 @@ public:
 
 	// Write out whole array to this
 	template <int amt>
-	void write(const std::array<T, amt>& a, const bool do_lock = true)
+	void write(const std::array<T, amt>& a, bool do_lock = true)
 	{
 		if (do_lock)
 			lock_write();
@@ -83,8 +87,7 @@ public:
 			unlock_write();
 	}
 	// Write out the first amount of stuff to this
-	template <int amt>
-	void write(const std::array<T, amt>& a, int amount, const bool do_lock = true)
+	void write(T* a, int amount, bool do_lock = true)
 	{
 		if (do_lock)
 			lock_write();
@@ -92,6 +95,20 @@ public:
 			this->push_back(a[i]);
 		if (do_lock)
 			unlock_write();
+	}
+
+	void write(std::vector<T>& a, bool do_lock = true)
+	{
+		if (do_lock)
+			lock_write();
+		for (auto& b : a) this->push_back(b);
+		if (do_lock)
+			unlock_write();
+	}
+
+	void done()
+	{
+		wait_lock.notify_all();
 	}
 
 	void lock_read()

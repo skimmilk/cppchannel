@@ -10,11 +10,7 @@
 
 #include <vector>
 #include <thread>
-#include <condition_variable>
-#include <mutex>
 #include <algorithm>
-#include <tr1/tuple>
-#include <atomic>
 
 #include <csp/message_stream.h>
 
@@ -40,18 +36,23 @@ private:
 
 public:
 	bool background;
-	csp_message_stream <t_in>* csp_input;
-	csp_message_stream <t_out> csp_output;
+	csp_message_stream<t_in>* csp_input;
+	bool unique_output;
+	csp_message_stream<t_out>* csp_output;
 
 	// Variable length...
 	// Putting this last allows for self-referential pipes to be called
 	//   through a pointer without knowing the size of the member to align
 	//   the other members, because there are no members below this variable
 	// Specifically fixes chan_read
-	std::tuple <t_args...> arguments;
+	std::tuple<t_args...> arguments;
 
 	csp_chan()
 	{
+		unique_output = true;
+		if (!is_nothing<t_out>::value)
+			csp_output = new csp_message_stream<t_out>();
+
 		background = false;
 		cache_write_head = 0;
 		csp_input = 0;
@@ -62,12 +63,14 @@ public:
 	{
 		if (background)
 			worker.join();
-		csp_output.finished = true;
+
+		if (!is_nothing<t_out>::value && unique_output)
+			delete csp_output;
 	}
 
 	void flush_cache()
 	{
-		csp_output.template write<cachesiz>(cache_write);
+		csp_output->template write<cachesiz>(cache_write);
 		cache_write_head = 0;
 	}
 
@@ -88,8 +91,7 @@ public:
 
 	bool read(t_in& input)
 	{
-		if (sizeof(t_in) != 0 && csp_input == 0)
-			throw std::runtime_error("Called read in CSP pipe without input");
+		static_assert(!is_nothing<t_in>::value, "Called read in CSP pipe without input");
 		if (!eof())
 		{
 			// If our local read cache is empty, request another one
@@ -112,6 +114,8 @@ public:
 	// Needed for csp_create...
 	csp_chan(const csp_chan& src)
 	{
+		unique_output = src.unique_output;
+		csp_output = src.csp_output;
 		csp_input = src.csp_input;
 		cache_write_head = src.cache_write_head;
 		cache_read_head = src.cache_read_head;
@@ -145,12 +149,17 @@ public:
 		// Clean up
 		if (!is_nothing<t_out>::value)
 		{
-			csp_output.lock_write();
-			csp_output.template write<cachesiz>(cache_write, cache_write_head, false);
-			csp_output.finished = true;
-			csp_output.unlock_write();
+			csp_output->lock_write();
+			csp_output->write(cache_write.data(), cache_write_head, false);
+			csp_output->finished = true;
+			csp_output->unlock_write();
 		}
 		return true;
+	}
+	void start_background()
+	{
+		background = true;
+		worker = std::thread(begin_background, this);
 	}
 private:
 	// Called by worker thread only, runs the runner
@@ -168,7 +177,7 @@ public:
 		// this = left, pipe = right
 		background = true;
 		pipe.background = true;
-		pipe.csp_input = &csp_output;
+		pipe.csp_input = csp_output;
 
 		// Right hand side doesn't output?
 		// Block further execution so we don't run over statements like
@@ -196,13 +205,13 @@ public:
 		// So we execute everything in this thread instead of a background one
 		background = false;
 		do_start();
-		out = csp_output;
+		out = *csp_output;
 		return *this;
 	}
 };
 
-template <typename t_in, typename t_out, typename holder, int cachesiz = 64,
-		typename... t_args>
+template <typename t_in, typename t_out, typename holder,
+		int cachesiz = CSP_CACHE_DEFAULT, typename... t_args>
 static csp_chan<t_in, t_out, cachesiz, t_args...>
 		csp_chan_create(t_args... args)
 {

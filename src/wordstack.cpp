@@ -38,7 +38,7 @@ CSP_DECL(elementize, string, vector<string>) ()
 // This finds 'word stacks' (I don't know what its really called)
 // Outputs something like
 // splittings splitting slitting sitting siting sting sing sin in i
-CSP_DECL(genlist, CSP::nothing, wordpair, int)(int length)
+CSP_DECL(genlist, nothing, wordpair, int)(int length)
 {
 	if (length == 1)
 		// Return all words length 1
@@ -75,11 +75,11 @@ int main(int argc, const char* argv[])
 			uniq<string>() | elementize() >>= dict;
 
 	genlist(9) |
-			chan_select<wordpair,string>(
+			chan_iter<wordpair,string>(
 					[](wordpair& s)
 			{
 				return s.word + " " + s.whatmadeit;
 			})
-				| sort<string>(false) | uniq<string>() | print();
+				| sort<string>(false) | print();
 	return 0;
 }
