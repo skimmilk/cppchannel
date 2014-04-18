@@ -47,10 +47,12 @@ CSP_DECL(genlist, nothing, wordpair, int)(int length)
 			put({a, ""});
 	else
 	{
+		auto thisptr = this;
 		// Recursion works!
 		genlist(length - 1) |
 			// Read every word genlist sends into variable 'shorter'
-			chan_read<wordpair>([this,length](wordpair& shorter)
+			parallel(3,
+					chan_read<wordpair>([thisptr,length](wordpair& shorter)
 			{
 				// Try to get a word that differs in one character
 				// If previous is 'i', next will be 'in', 'is',...
@@ -62,9 +64,10 @@ CSP_DECL(genlist, nothing, wordpair, int)(int length)
 							difference++;
 
 					if (difference <= 1)
-						this->put({longer, shorter.word + " " + shorter.whatmadeit});
+						thisptr->safe_put({longer, shorter.word + " " + shorter.whatmadeit});
 				}
-			});
+			})
+			);
 	}
 }
 

@@ -70,7 +70,7 @@ public:
 };
 template <typename t_in, typename t_out, int cache, typename... t_args>
 CSP::channel<
-	t_in, t_in, CSP_CACHE_DEFAULT, int,
+	t_in, t_out, CSP_CACHE_DEFAULT, int,
 	CSP::channel<t_in,t_out,cache,t_args...>*
 	>
 	parallel(int numthreads, CSP::channel<t_in,t_out,cache,t_args...>&& channel)

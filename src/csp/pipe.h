@@ -33,6 +33,7 @@ private:
 	int cache_write_head;
 
 	std::thread worker;
+	std::mutex safelock;
 
 public:
 	bool background;
@@ -81,6 +82,12 @@ public:
 		cache_write[cache_write_head] = out;
 		cache_write_head++;
 	}
+	void safe_put(const t_out& out)
+	{
+		safelock.lock();
+		put(out);
+		safelock.unlock();
+	}
 
 	// The input program finished writing
 	// Nothing to read and is finished
@@ -108,6 +115,13 @@ public:
 			return true;
 		}
 		return false;
+	}
+	bool safe_read(t_in& input)
+	{
+		safelock.lock();
+		auto r = read(input);
+		safelock.unlock();
+		return r;
 	}
 
 	// Copy constructor, won't compile without this
