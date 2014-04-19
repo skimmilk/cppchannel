@@ -59,7 +59,7 @@ CSP_DECL(to_lower, std::string, std::string) ()
  * ================================
  */
 template <typename t_in>
-class sort_t_: public CSP::channel<t_in, t_in, CSP_CACHE_DEFAULT, bool>
+class sort_t_: public CSP::channel<t_in, t_in, bool>
 {
 public:
 	void run(bool reverse)
@@ -86,10 +86,10 @@ public:
 	}
 };
 template <typename t_in>
-CSP::channel<t_in, t_in, CSP_CACHE_DEFAULT, bool> sort(bool a = false)
+CSP::channel<t_in, t_in, bool> sort(bool a = false)
 {
 	return CSP::chan_create<
-			t_in, t_in, sort_t_<t_in>, CSP_CACHE_DEFAULT, bool>(a);
+			t_in, t_in, sort_t_<t_in>, bool>(a);
 }/* sort */
 
 /* ================================
@@ -166,10 +166,9 @@ CSP_DECL(print_log, std::string, CSP::nothing)()
  */
 // vec has a very fast output
 // To avoid spamming thread locks uselessly, write less often
-#define CSP_CAT_CACHE (CSP_CACHE_DEFAULT*4)
 template <typename t_in>
 class cat_generic : public
-	CSP::channel<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
+	CSP::channel<CSP::nothing, t_in, std::vector<t_in>*>
 {
 public:
 	void run(std::vector<t_in>* kitty)
@@ -179,15 +178,15 @@ public:
 	}
 };
 template <typename t_in>
-CSP::channel<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*>
+CSP::channel<CSP::nothing, t_in, std::vector<t_in>*>
 		vec(std::vector<t_in>& kitty)
 {
-	channel<CSP::nothing, t_in, CSP_CAT_CACHE, std::vector<t_in>*> a;
+	channel<CSP::nothing, t_in, std::vector<t_in>*> a;
 	a.arguments = std::make_tuple(&kitty);
 	// Fun fact: I figured out how to type this line
 	//  due to helpful compiler errors
 	a.start = (void(
-			channel<CSP::nothing,t_in,CSP_CAT_CACHE,std::vector<t_in>*>::*)
+			channel<CSP::nothing,t_in,std::vector<t_in>*>::*)
 		(std::vector<t_in>*))&cat_generic<t_in>::run;
 
 	return a;

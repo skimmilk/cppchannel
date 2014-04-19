@@ -1,8 +1,9 @@
-#define CSP_CACHE_DEFAULT 64
+// Testing shows that for wordstack, this is the optimal value
+#define CSP_CACHE_DEFAULT 32
 
-#define CSP_DECL_CONTAINER(fn_name, input, output,cache, ...)\
+#define CSP_DECL_CONTAINER(fn_name, input, output, ...)\
 	class _##fn_name##_t_ : public\
-			CSP::channel<input,output,cache,##__VA_ARGS__>\
+			CSP::channel<input,output,##__VA_ARGS__>\
 	{\
 	public:\
 		void run(__VA_ARGS__);\
@@ -12,22 +13,17 @@ CSP::channel<t_in, t_in, CSP_CACHE_DEFAULT, bool> sort(bool a = false)
 	return CSP::chan_create<t_in, t_in, sort_t_<t_in>, CSP_CACHE_DEFAULT, bool>(a);*/
 
 
-#define CSP_DECL_TEMPL_INIT(fn_name,templed_name,input,output,cache,...)\
-	CSP::channel<input,output,cache,##__VA_ARGS__> (*fn_name)(__VA_ARGS__) =\
-	CSP::chan_create<input,output,templed_name,cache,##__VA_ARGS__>;
+#define CSP_DECL_TEMPL_INIT(fn_name,templed_name,input,output,...)\
+	CSP::channel<input,output,##__VA_ARGS__> (*fn_name)(__VA_ARGS__) =\
+	CSP::chan_create<input,output,templed_name,##__VA_ARGS__>;
 
-#define CSP_DECL_INITIALIZER(fn_name,input,output,cache,...)\
-	CSP::channel<input,output,cache,##__VA_ARGS__> (*fn_name)(__VA_ARGS__) =\
-	CSP::chan_create<input,output,_##fn_name##_t_,cache,##__VA_ARGS__>;
-
-#define CSP_DECLC(fn_name,input,output,cache,...)\
-	CSP_DECL_CONTAINER(fn_name,input,output,cache,##__VA_ARGS__)\
-	CSP_DECL_INITIALIZER(fn_name,input,output,cache,##__VA_ARGS__)\
-	void fn_name::run
+#define CSP_DECL_INITIALIZER(fn_name,input,output,...)\
+	CSP::channel<input,output,##__VA_ARGS__> (*fn_name)(__VA_ARGS__) =\
+	CSP::chan_create<input,output,_##fn_name##_t_,##__VA_ARGS__>;
 
 #define CSP_DECL(fn_name,input,output,...)\
-	CSP_DECL_CONTAINER(fn_name,input,output,CSP_CACHE_DEFAULT,##__VA_ARGS__)\
-	CSP_DECL_INITIALIZER(fn_name,input,output,CSP_CACHE_DEFAULT,##__VA_ARGS__)\
+	CSP_DECL_CONTAINER(fn_name,input,output,##__VA_ARGS__)\
+	CSP_DECL_INITIALIZER(fn_name,input,output,##__VA_ARGS__)\
 void _##fn_name##_t_ ::run
 
 // jesus christ how horrifying

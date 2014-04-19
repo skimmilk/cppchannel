@@ -11,6 +11,7 @@
 #include <vector>
 #include <thread>
 #include <algorithm>
+#include <cassert>
 
 #include <csp/message_stream.h>
 
@@ -21,17 +22,12 @@ struct nothing { char a; };
 template<typename T> struct is_nothing { static const bool value = false; };
 template<> struct is_nothing<nothing> { static const bool value = true; };
 
-template <typename t_in, typename t_out, int cachesiz = 64, typename... t_args>
+template <typename t_in, typename t_out, typename... t_args>
 class channel
 {
-	using this_pipe = channel<t_in,t_out,cachesiz,t_args...>;
+	using this_pipe = channel<t_in,t_out,t_args...>;
 private:
 	// Wait to write till this is filled
-	std::array<t_out, cachesiz> cache_write;
-	std::vector<t_in> cache_read;
-	int cache_read_head;
-	int cache_write_head;
-
 	std::thread worker;
 	std::mutex safelock;
 
@@ -58,9 +54,7 @@ public:
 			csp_output = new message_stream<t_out>();
 
 		background = false;
-		cache_write_head = 0;
 		csp_input = 0;
-		cache_read_head = 0;
 	}
 	// Wait to finish first, then exit to self-destruct
 	~channel()
@@ -74,18 +68,9 @@ public:
 			delete csp_input;
 	}
 
-	void flush_cache()
-	{
-		csp_output->template write<cachesiz>(cache_write);
-		cache_write_head = 0;
-	}
-
 	void put(const t_out& out)
 	{
-		if (cache_write_head == cachesiz)
-			flush_cache();
-		cache_write[cache_write_head] = out;
-		cache_write_head++;
+		csp_output->write(out);
 	}
 	void safe_put(const t_out& out)
 	{
@@ -93,33 +78,16 @@ public:
 		put(out);
 		safelock.unlock();
 	}
-
-	// The input program finished writing
-	// Nothing to read and is finished
-	bool eof()
+	// No need to initialize something to read
+	t_in& input_reference()
 	{
-		return cache_read.size() <= cache_read_head && csp_input->size() == 0 && csp_input->finished;
+		return csp_input->last_read;
 	}
 
 	bool read(t_in& input)
 	{
 		static_assert(!is_nothing<t_in>::value, "Called read in CSP pipe without input");
-		if (!eof())
-		{
-			// If our local read cache is empty, request another one
-			if (cache_read.size() > cache_read_head)
-				input = cache_read[cache_read_head++];
-			else
-			{ // Empty, gotta read more
-				cache_read.clear();
-				if (csp_input->read(cache_read) == 0)
-					return false;
-				cache_read_head = 1;
-				input = cache_read[0];
-			}
-			return true;
-		}
-		return false;
+		return csp_input->read(input);
 	}
 	bool safe_read(t_in& input)
 	{
@@ -131,13 +99,13 @@ public:
 
 	// Copy constructor, won't compile without this
 	// Needed for csp_create...
+	// Never actually gets called just put stuff here to stop compiler warnings
 	channel(const channel& src)
 	{
+		manage_input = src.manage_input;
 		unique_output = src.unique_output;
 		csp_output = src.csp_output;
 		csp_input = src.csp_input;
-		cache_write_head = src.cache_write_head;
-		cache_read_head = src.cache_read_head;
 		background = src.background;
 	}
 	/* DO NOT TOUCH */
@@ -158,6 +126,7 @@ public:
 	// Starting point to finally do all the work
 	bool do_start()
 	{
+		assert(is_nothing<t_in>::value || csp_input != 0);
 		// Create a tuple with the this pointer and arguments together
 		// Works with the tuple expander call function easily
 		std::tuple<channel*> head (this);
@@ -165,14 +134,9 @@ public:
 				std::tuple_cat(head, arguments);
 		call(do_start_actually, thisargs);
 
-		// Clean up
+		// Finished processing input
 		if (!is_nothing<t_out>::value)
-		{
-			csp_output->lock_write();
-			csp_output->write(cache_write.data(), cache_write_head, false);
-			csp_output->finished = true;
-			csp_output->unlock_write();
-		}
+			csp_output->done();
 		return true;
 	}
 	void start_background()
@@ -189,9 +153,9 @@ private:
 
 public:
 	// The pipe | operator
-	template <typename ot_in,typename ot_out,int ocachesiz,typename...ot_args>
-	channel<ot_in, ot_out, ocachesiz, ot_args...>&
-		operator |(channel<ot_in,ot_out,ocachesiz,ot_args...>&& pipe)
+	template <typename ot_in,typename ot_out,typename...ot_args>
+	channel<ot_in, ot_out, ot_args...>&
+		operator |(channel<ot_in,ot_out,ot_args...>&& pipe)
 	{
 		// this = left, pipe = right
 		background = true;
@@ -224,17 +188,19 @@ public:
 		// So we execute everything in this thread instead of a background one
 		background = false;
 		do_start();
-		out = *csp_output;
+		t_out& a = csp_output->last_read;
+		while (csp_output->read(a))
+			out.push_back(a);
 		return *this;
 	}
 };
 
 template <typename t_in, typename t_out, typename holder,
-		int cachesiz = CSP_CACHE_DEFAULT, typename... t_args>
-static channel<t_in, t_out, cachesiz, t_args...>
+		typename... t_args>
+static channel<t_in, t_out, t_args...>
 		chan_create(t_args... args)
 {
-	using this_pipe = channel<t_in,t_out,cachesiz,t_args...>;
+	using this_pipe = channel<t_in,t_out,t_args...>;
 
 	this_pipe a;
 	a.arguments = std::make_tuple(args...);

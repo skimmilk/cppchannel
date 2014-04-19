@@ -17,15 +17,15 @@
  * Should only be used on channels whose input processing is slow
  * ================================================================
  */
-template <typename t_in, typename t_out, int cache, typename... args>
+template <typename t_in, typename t_out, typename... args>
 class unordered_parallel_t : public
 	CSP::channel<
-		t_in, t_out, cache, int, CSP::channel<t_in,t_out,cache,args...>*>
+		t_in, t_out,  int, CSP::channel<t_in,t_out,args...>*>
 {
 public:
-	void run(int threadcount, CSP::channel<t_in,t_out,cache,args...>* channel)
+	void run(int threadcount, CSP::channel<t_in,t_out,args...>* channel)
 	{
-		std::vector<CSP::channel<t_in,t_out,cache,args...>> chans;
+		std::vector<CSP::channel<t_in,t_out,args...>> chans;
 
 		chans.resize(threadcount);
 
@@ -42,23 +42,14 @@ public:
 			a.start_background();
 		}
 
-		t_in current;
-		std::vector<t_in> input_cache;
+		t_in& current = this->input_reference();
 		int write_to_index = 0;
 		while (this->read(current))
 		{
-			input_cache.push_back(current);
-			if (input_cache.size() == cache)
-			{
-				chans[write_to_index].csp_input->write(input_cache);
-				write_to_index++;
-				write_to_index %= threadcount;
-				input_cache.clear();
-			}
+			chans[write_to_index].csp_input->write(current);
+			write_to_index++;
+			write_to_index %= threadcount;
 		}
-		// Empty out cache
-		if (input_cache.size())
-			chans[write_to_index].csp_input->write(input_cache);
 
 		for (auto& a : chans)
 		{
@@ -69,23 +60,23 @@ public:
 		}
 	}
 };
-template <typename t_in, typename t_out, int cache, typename... t_args>
+template <typename t_in, typename t_out, typename... t_args>
 CSP::channel<
-	t_in, t_out, CSP_CACHE_DEFAULT, int,
-	CSP::channel<t_in,t_out,cache,t_args...>*
+	t_in, t_out, int,
+	CSP::channel<t_in,t_out,t_args...>*
 	>
-	parallel(int numthreads, CSP::channel<t_in,t_out,cache,t_args...>&& channel)
+	parallel(int numthreads, CSP::channel<t_in,t_out,t_args...>&& channel)
 {
 	static_assert(!CSP::is_nothing<t_in>::value,
 			"parallel needs an input channel");
 
 	using type = CSP::channel<
-			t_in,t_out,cache,int,CSP::channel<t_in,t_out,cache,t_args...>*>;
+			t_in,t_out,int,CSP::channel<t_in,t_out,t_args...>*>;
 
 	type a;
 	a.arguments = std::make_tuple(numthreads, &channel);
-	a.start = (void(type::*)(int, CSP::channel<t_in,t_out,cache,t_args...>*))
-			&unordered_parallel_t<t_in,t_out,cache,t_args...>::run;
+	a.start = (void(type::*)(int, CSP::channel<t_in,t_out,t_args...>*))
+			&unordered_parallel_t<t_in,t_out,t_args...>::run;
 	return a;
 
 }/* parallel */

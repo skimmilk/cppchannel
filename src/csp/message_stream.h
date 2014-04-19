@@ -11,6 +11,8 @@
 #include <mutex>
 #include <condition_variable>
 #include <vector>
+#include <list>
+#include <atomic>
 
 #include <csp/spaghetti.h>
 
@@ -22,93 +24,163 @@ namespace CSP{
 // Cache isn't implemented here because it would require the holder
 //  of input and output channels to know the cache sizes of each other
 template<typename T>
-class message_stream : public std::vector<T>
+class message_stream
 {
 private:
 	std::mutex wait_lock_m;
 	// Locked when reading/writing
 	std::mutex flush;
 	std::unique_lock<std::mutex> wait_lock_ml;
+	std::list<std::array<T, CSP_CACHE_DEFAULT>> list;
+	int readhead, writehead;
+	std::atomic_int listsiz;
 public:
+	T last_read;
 	// Wait on this for input
 	std::condition_variable wait_lock;
 
-	bool finished;
+	std::atomic_bool finished;
 
 	message_stream()
 	{
+		readhead = listsiz = writehead = 0;
 		finished = false;
 		wait_lock_ml = std::unique_lock<std::mutex>(wait_lock_m);
 	}
 
-	// Do the actual read, just the read
-	void do_read(std::vector<T>& outvec)
+	// Returns true if we need another go-around
+	bool do_read(bool islocking)
 	{
-		int siz = this->size();
-		for (int i = 0; i < siz; i++)
-			outvec.push_back(this->at(i));
-	}
-	// Read as much as we can INTO buffer
-	// Need to lock because writing could modify the buffer's location
-	int read(std::vector<T>& buffer)
-	{
-		retry_read:
-		lock_read();
-		size_t siz = this->size();
-
-		if (finished)
+		if (readhead == CSP_CACHE_DEFAULT)
 		{
-			if (siz)
-				do_read(buffer);
+			if (!islocking)
+				lockthis();
+			readhead = 0;
+			list.pop_front();
+			listsiz--;
+			if (!islocking)
+				careful_unlock();
+			return true;
 		}
-		else if (siz)
-			do_read(buffer);
+		last_read = list.front()[readhead++];
+		return false;
+	}
+	bool safe_read(const bool lock)
+	{
+		retry:
+		if (lock) lockthis();
+
+		if (listsiz == 0)
+			if (finished)
+				return false;
+			else
+			{
+				if (lock) careful_unlock();
+				wait_write();
+				goto retry;
+			}
+		// If we are down to one cache, think carefully about read/write heads
+		else if (listsiz == 1)
+		{
+			if (readhead >= writehead)
+				if (finished)
+					return false;
+				else
+				{
+					if (lock) careful_unlock();
+					wait_write();
+					goto retry;
+				}
+			else
+				if (do_read(lock))
+				{
+					if (lock) careful_unlock();
+					goto retry;
+				}
+		}
+		// We have more than one cache remaining in list
+		else
+			if (do_read(lock))
+			{
+				if (lock)
+					careful_unlock();
+				goto retry;
+			}
+		if (lock)
+			careful_unlock();
+		return true;
+	}
+
+	bool read(T& t)
+	{
+		if (!safe_read(false))
+			return safe_read(true);
+		t = last_read;
+		return true;
+	}
+
+	void do_write(const T& t, const bool locking)
+	{
+		if (writehead == CSP_CACHE_DEFAULT)
+		{
+			if (!locking)
+				lockthis();
+
+			std::array<T, CSP_CACHE_DEFAULT> adder;
+			list.push_back(adder);
+			listsiz++;
+			writehead = 0;
+
+			if (!locking)
+				careful_unlock();
+			// This is the optimal place to notify watching threads,
+			//   according to tests
+			wait_lock.notify_all();
+		}
+		list.back()[writehead++] = t;
+	}
+	void write(const T& t)
+	{
+		// Keep track if we are in a thread-safe mode
+		bool locked = false;
+		retry:
+		if (!locked)
+		{
+			if (listsiz == 0 || listsiz == 1) // Not safe to add without lock
+			{
+				lockthis();
+				locked = true;
+				goto retry;
+			}
+			else
+				do_write(t, false);
+		}
 		else
 		{
-			unlock_read();
-			wait_write();
-			goto retry_read;
+			if (listsiz == 0)
+			{
+				list.resize(1);
+				listsiz++;
+				writehead = 0;
+			}
+			do_write(t, true);
+			careful_unlock();
 		}
-
-		this->clear();
-		unlock_read();
-
-		return siz;
-	}
-
-	// Write out whole array to this
-	template <int amt>
-	void write(const std::array<T, amt>& a, bool do_lock = true)
-	{
-		if (do_lock)
-			lock_write();
-		for (auto& b : a) this->push_back(b);
-		if (do_lock)
-			unlock_write();
-	}
-	// Write out the first amount of stuff to this
-	void write(T* a, int amount, bool do_lock = true)
-	{
-		if (do_lock)
-			lock_write();
-		for (int i = 0; i < amount; i++)
-			this->push_back(a[i]);
-		if (do_lock)
-			unlock_write();
-	}
-
-	void write(std::vector<T>& a, bool do_lock = true)
-	{
-		if (do_lock)
-			lock_write();
-		for (auto& b : a) this->push_back(b);
-		if (do_lock)
-			unlock_write();
 	}
 
 	void done()
 	{
+		finished = true;
 		wait_lock.notify_all();
+	}
+
+	void lockthis()
+	{
+		flush.lock();
+	}
+	void careful_unlock()
+	{
+		flush.unlock();
 	}
 
 	void lock_read()
