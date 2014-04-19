@@ -37,7 +37,9 @@ private:
 
 public:
 	bool background;
+	bool manage_input;
 	message_stream<t_in>* csp_input;
+
 	bool unique_output;
 	message_stream<t_out>* csp_output;
 
@@ -50,6 +52,7 @@ public:
 
 	channel()
 	{
+		manage_input = false;
 		unique_output = true;
 		if (!is_nothing<t_out>::value)
 			csp_output = new message_stream<t_out>();
@@ -67,6 +70,8 @@ public:
 
 		if (!is_nothing<t_out>::value && unique_output)
 			delete csp_output;
+		if (!is_nothing<t_in>::value && manage_input)
+			delete csp_input;
 	}
 
 	void flush_cache()

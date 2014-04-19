@@ -34,6 +34,7 @@ public:
 			a.csp_output = this->csp_output;
 			a.unique_output = false;
 			a.csp_input = new CSP::message_stream<t_in>();
+			a.manage_input = true;
 
 			a.arguments = channel->arguments;
 			a.start = channel->start;
