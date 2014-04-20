@@ -40,6 +40,7 @@ public:
 	std::condition_variable wait_lock;
 
 	std::atomic_bool finished;
+	std::mutex waiting;
 
 	message_stream()
 	{
@@ -54,28 +55,28 @@ public:
 		if (readhead == CSP_CACHE_DEFAULT)
 		{
 			if (!islocking)
-				lockthis();
+				lock_this();
 			readhead = 0;
 			list.pop_front();
 			listsiz--;
 			if (!islocking)
-				careful_unlock();
+				unlock_this();
 			return true;
 		}
 		last_read = list.front()[readhead++];
 		return false;
 	}
-	bool safe_read(const bool lock)
+	bool safe_read(const bool dolock)
 	{
 		retry:
-		if (lock) lockthis();
+		if (dolock) lock_this();
 
 		if (listsiz == 0)
 			if (finished)
 				return false;
 			else
 			{
-				if (lock) careful_unlock();
+				if (dolock) unlock_this();
 				wait_write();
 				goto retry;
 			}
@@ -87,27 +88,27 @@ public:
 					return false;
 				else
 				{
-					if (lock) careful_unlock();
+					if (dolock) unlock_this();
 					wait_write();
 					goto retry;
 				}
 			else
-				if (do_read(lock))
+				if (do_read(dolock))
 				{
-					if (lock) careful_unlock();
+					if (dolock) unlock_this();
 					goto retry;
 				}
 		}
 		// We have more than one cache remaining in list
 		else
-			if (do_read(lock))
+			if (do_read(dolock))
 			{
-				if (lock)
-					careful_unlock();
+				if (dolock)
+					unlock_this();
 				goto retry;
 			}
-		if (lock)
-			careful_unlock();
+		if (dolock)
+			unlock_this();
 		return true;
 	}
 
@@ -124,7 +125,7 @@ public:
 		if (writehead == CSP_CACHE_DEFAULT)
 		{
 			if (!locking)
-				lockthis();
+				lock_this();
 
 			std::array<T, CSP_CACHE_DEFAULT> adder;
 			list.push_back(adder);
@@ -132,7 +133,7 @@ public:
 			writehead = 0;
 
 			if (!locking)
-				careful_unlock();
+				unlock_this();
 			// This is the optimal place to notify watching threads,
 			//   according to tests
 			wait_lock.notify_all();
@@ -148,7 +149,7 @@ public:
 		{
 			if (listsiz == 0 || listsiz == 1) // Not safe to add without lock
 			{
-				lockthis();
+				lock_this();
 				locked = true;
 				goto retry;
 			}
@@ -164,21 +165,22 @@ public:
 				writehead = 0;
 			}
 			do_write(t, true);
-			careful_unlock();
+			unlock_this();
 		}
 	}
 
 	void done()
 	{
 		finished = true;
+		waiting.try_lock();
 		wait_lock.notify_all();
 	}
 
-	void lockthis()
+	void lock_this()
 	{
 		flush.lock();
 	}
-	void careful_unlock()
+	void unlock_this()
 	{
 		flush.unlock();
 	}
@@ -202,7 +204,10 @@ public:
 	}
 	void wait_write()
 	{
+		if (!waiting.try_lock())
+			return;
 		wait_lock.wait(wait_lock_ml);
+		waiting.unlock();
 	}
 };
 
