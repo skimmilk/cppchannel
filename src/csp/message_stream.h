@@ -42,28 +42,38 @@ public:
 	std::atomic_bool finished;
 	std::mutex waiting;
 
+	// Set true to always lock on read/write
+	bool always_lock;
+
 	message_stream()
 	{
+		always_lock = false;
 		readhead = listsiz = writehead = 0;
 		finished = false;
 		wait_lock_ml = std::unique_lock<std::mutex>(wait_lock_m);
 	}
 
 	// Returns true if we need another go-around
-	bool do_read()
+	bool do_read(bool dolock)
 	{
 		if (readhead == CSP_CACHE_DEFAULT)
 		{
+			if (dolock)
+				lock_this();
+
 			readhead = 0;
 			list.pop_front();
 			listsiz--;
+
+			if (dolock)
+				unlock_this();
 			return true;
 		}
 		last_read = list.front()[readhead++];
 		return false;
 	}
 
-	bool read(T& t)
+	bool safe_read()
 	{
 		retry_wlock:
 		lock_this();
@@ -91,33 +101,57 @@ public:
 					goto retry_wlock;
 				}
 			else
-				if (do_read())
+				if (do_read(false))
 					goto retry;
 		}
 		// We have more than one cache remaining in list
 		else
-			if (do_read())
+			if (do_read(false))
 				goto retry;
 		unlock_this();
 
+		return true;
+	}
+
+	bool read(T& t)
+	{
+		// Avoid locking, if list has plenty of data,
+		// the data has been written back and is safe to read
+		// We will lock if it is possible writes are messing with head of list
+		retry:
+		if (!always_lock && listsiz > 2)
+		{
+			if (do_read(true))
+				goto retry;
+		}
+		else if (!safe_read())
+			return false;
 		t = last_read;
 		return true;
 	}
 
-	void do_write(const T& t)
+	void do_write(const T& t, bool dolock)
 	{
 		if (writehead == CSP_CACHE_DEFAULT)
 		{
+			if (dolock)
+				lock_this();
 			std::array<T, CSP_CACHE_DEFAULT> adder;
 			list.push_back(adder);
 			listsiz++;
 			writehead = 0;
 
-			wait_lock.notify_all();
+			if (dolock)
+				unlock_this();
+
+			// Threads will only be waiting on this read
+			//   if the size is 0, 1, or 2
+			if (listsiz < 3)
+				wait_lock.notify_all();
 		}
 		list.back()[writehead++] = t;
 	}
-	void write(const T& t)
+	void safe_write(const T& t)
 	{
 		lock_this();
 		// Keep track if we are in a thread-safe mode
@@ -127,8 +161,16 @@ public:
 			listsiz++;
 			writehead = 0;
 		}
-		do_write(t);
+		do_write(t, false);
 		unlock_this();
+	}
+	void write(const T& t)
+	{
+		// We will lock if writing will mess with the head of the list
+		if (!always_lock && listsiz > 2)
+			do_write(t, true);
+		else
+			safe_write(t);
 	}
 
 	void done()

@@ -31,6 +31,8 @@ public:
 
 		for (auto& a : chans)
 		{
+			if (!CSP::is_nothing<t_out>::value)
+				this->csp_output->always_lock = true;
 			a.csp_output = this->csp_output;
 			a.unique_output = false;
 			a.csp_input = new CSP::message_stream<t_in>();

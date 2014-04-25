@@ -72,11 +72,24 @@ public:
 	{
 		csp_output->write(out);
 	}
+	// Needed if multiple threads accessing this channel
+	void safe_put(const t_out& out)
+	{
+		csp_output->safe_write(out);
+	}
 
 	bool read(t_in& input)
 	{
-		static_assert(!is_nothing<t_in>::value, "Called read in CSP pipe without input");
+		static_assert(!is_nothing<t_in>::value,
+				"Called read in CSP pipe without input");
 		return csp_input->read(input);
+	}
+	// Needed if multiple threads accessing this channel
+	bool safe_read(t_in& input)
+	{
+		static_assert(!is_nothing<t_in>::value,
+				"Called read in CSP pipe without input");
+		return csp_input->safe_read(input);
 	}
 
 	// Copy constructor, won't compile without this
