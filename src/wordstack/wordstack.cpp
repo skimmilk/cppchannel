@@ -58,13 +58,18 @@ CSP_DECL(genlist, nothing, wordpair, int)(int length)
 				// If previous is 'i', next will be 'in', 'is',...
 				for (auto& longer : dict[length-1])
 				{
+					// Read-only references avoids triggering copy-on-write
+					const char* str_short = shorter.word.c_str();
+					const char* str_long = longer.c_str();
+
 					int difference = 0;
 					for (int i = 0; i < length && difference <= 1; i++)
-						if (shorter.word[i-difference] != longer[i])
+						if (str_short[i-difference] != str_long[i])
 							difference++;
 
 					if (difference <= 1)
-						thisptr->safe_put({longer, shorter.word + " " + shorter.whatmadeit});
+						thisptr->safe_put({longer,
+							shorter.word + " " + shorter.whatmadeit});
 				}
 			})
 			);
