@@ -33,7 +33,7 @@ private:
 	std::unique_lock<std::mutex> wait_lock_ml;
 	std::list<std::array<T, CSP_CACHE_DEFAULT>> list;
 	int readhead, writehead;
-	std::atomic_int listsiz;
+	int listsiz;
 public:
 	T last_read;
 	// Wait on this for input
@@ -50,35 +50,33 @@ public:
 	}
 
 	// Returns true if we need another go-around
-	bool do_read(bool islocking)
+	bool do_read()
 	{
 		if (readhead == CSP_CACHE_DEFAULT)
 		{
-			if (!islocking)
-				lock_this();
 			readhead = 0;
 			list.pop_front();
 			listsiz--;
-			if (!islocking)
-				unlock_this();
 			return true;
 		}
 		last_read = list.front()[readhead++];
 		return false;
 	}
-	bool safe_read(const bool dolock)
+
+	bool read(T& t)
 	{
+		retry_wlock:
+		lock_this();
 		retry:
-		if (dolock) lock_this();
 
 		if (listsiz == 0)
 			if (finished)
 				return false;
 			else
 			{
-				if (dolock) unlock_this();
+				unlock_this();
 				wait_write();
-				goto retry;
+				goto retry_wlock;
 			}
 		// If we are down to one cache, think carefully about read/write heads
 		else if (listsiz == 1)
@@ -88,85 +86,49 @@ public:
 					return false;
 				else
 				{
-					if (dolock) unlock_this();
+					unlock_this();
 					wait_write();
-					goto retry;
+					goto retry_wlock;
 				}
 			else
-				if (do_read(dolock))
-				{
-					if (dolock) unlock_this();
+				if (do_read())
 					goto retry;
-				}
 		}
 		// We have more than one cache remaining in list
 		else
-			if (do_read(dolock))
-			{
-				if (dolock)
-					unlock_this();
+			if (do_read())
 				goto retry;
-			}
-		if (dolock)
-			unlock_this();
-		return true;
-	}
+		unlock_this();
 
-	bool read(T& t)
-	{
-		if (!safe_read(false))
-			return safe_read(true);
 		t = last_read;
 		return true;
 	}
 
-	void do_write(const T& t, const bool locking)
+	void do_write(const T& t)
 	{
 		if (writehead == CSP_CACHE_DEFAULT)
 		{
-			if (!locking)
-				lock_this();
-
 			std::array<T, CSP_CACHE_DEFAULT> adder;
 			list.push_back(adder);
 			listsiz++;
 			writehead = 0;
 
-			if (!locking)
-				unlock_this();
-			// This is the optimal place to notify watching threads,
-			//   according to tests
 			wait_lock.notify_all();
 		}
 		list.back()[writehead++] = t;
 	}
 	void write(const T& t)
 	{
+		lock_this();
 		// Keep track if we are in a thread-safe mode
-		bool locked = false;
-		retry:
-		if (!locked)
+		if (listsiz == 0)
 		{
-			if (listsiz == 0 || listsiz == 1) // Not safe to add without lock
-			{
-				lock_this();
-				locked = true;
-				goto retry;
-			}
-			else
-				do_write(t, false);
+			list.resize(1);
+			listsiz++;
+			writehead = 0;
 		}
-		else
-		{
-			if (listsiz == 0)
-			{
-				list.resize(1);
-				listsiz++;
-				writehead = 0;
-			}
-			do_write(t, true);
-			unlock_this();
-		}
+		do_write(t);
+		unlock_this();
 	}
 
 	void done()
@@ -185,18 +147,6 @@ public:
 		flush.unlock();
 	}
 
-	void lock_read()
-	{
-		flush.lock();
-	}
-	void unlock_read()
-	{
-		flush.unlock();
-	}
-	void lock_write()
-	{
-		flush.lock();
-	}
 	void unlock_write()
 	{
 		flush.unlock();

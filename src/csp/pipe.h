@@ -72,29 +72,11 @@ public:
 	{
 		csp_output->write(out);
 	}
-	void safe_put(const t_out& out)
-	{
-		safelock.lock();
-		put(out);
-		safelock.unlock();
-	}
-	// No need to initialize something to read
-	t_in& input_reference()
-	{
-		return csp_input->last_read;
-	}
 
 	bool read(t_in& input)
 	{
 		static_assert(!is_nothing<t_in>::value, "Called read in CSP pipe without input");
 		return csp_input->read(input);
-	}
-	bool safe_read(t_in& input)
-	{
-		safelock.lock();
-		auto r = read(input);
-		safelock.unlock();
-		return r;
 	}
 
 	// Copy constructor, won't compile without this

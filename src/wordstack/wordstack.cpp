@@ -64,7 +64,7 @@ CSP_DECL(genlist, nothing, wordpair, int)(int length)
 							difference++;
 
 					if (difference <= 1)
-						thisptr->safe_put({longer, shorter.word + " " + shorter.whatmadeit});
+						thisptr->put({longer, shorter.word + " " + shorter.whatmadeit});
 				}
 			})
 			);

@@ -42,7 +42,7 @@ public:
 			a.start_background();
 		}
 
-		t_in& current = this->input_reference();
+		t_in current;
 		int write_to_index = 0;
 		while (this->read(current))
 		{
@@ -53,7 +53,7 @@ public:
 
 		for (auto& a : chans)
 		{
-			a.csp_input->lock_write();
+			a.csp_input->lock_this();
 			a.csp_input->finished = true;
 			a.csp_input->unlock_write();
 			a.csp_input->done();
