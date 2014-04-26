@@ -10,7 +10,7 @@
 
 #include <csp/csplib.h>
 
-namespace CSP{
+namespace csp{
 
 /* ================================================================
  * chan_select
@@ -18,14 +18,14 @@ namespace CSP{
  * ================================================================
  */
 template <typename t_in>
-class chan_select_t : public CSP::channel<
+class chan_select_t : public csp::channel<
 		t_in, t_in,
 		std::function<bool(t_in&)>>
 {
 public:
 	using funkname = std::function<bool(t_in&)>;
-	// This is the type we want to be, a CSP pipe
-	using thistype = CSP::channel<
+	// This is the type we want to be, a csp pipe
+	using thistype = csp::channel<
 		t_in, t_in,
 		funkname>;
 
@@ -38,7 +38,7 @@ public:
 };
 // channel functor
 template <typename t_in>
-CSP::channel
+csp::channel
 <
 	t_in,
 	t_in,
@@ -49,7 +49,7 @@ CSP::channel
 					asdf)
 {
 	using funkname = std::function<bool(t_in&)>;
-	using thistype = CSP::channel<
+	using thistype = csp::channel<
 		t_in, t_in,
 		funkname>;
 	thistype result;
@@ -68,14 +68,14 @@ CSP::channel
  * ================================================================
  */
 template <typename t_in, typename t_out>
-class chan_readwrite_t : public CSP::channel<
+class chan_readwrite_t : public csp::channel<
 		t_in, t_out,
-		std::function<void(CSP::channel<t_in,t_out>*, t_in&)>>
+		std::function<void(csp::channel<t_in,t_out>*, t_in&)>>
 {
 public:
-	using funkname = std::function<void(CSP::channel<t_in,t_out>*, t_in&)>;
-	// This is the type we want to be, a CSP pipe
-	using thistype = CSP::channel<
+	using funkname = std::function<void(csp::channel<t_in,t_out>*, t_in&)>;
+	// This is the type we want to be, a csp pipe
+	using thistype = csp::channel<
 		t_in, t_out,
 		funkname>;
 
@@ -88,19 +88,19 @@ public:
 };
 // channel functor
 template <typename t_in, typename t_out>
-CSP::channel
+csp::channel
 <
 	t_in,
 	t_out,
 	std::function<void(t_in&)>
 >
 	chan_readwrite(
-		std::function<void(CSP::channel<t_in,t_out>*, t_in&)>
+		std::function<void(csp::channel<t_in,t_out>*, t_in&)>
 					asdf)
 {
-	using funkname = std::function<void(CSP::channel<t_in,t_out>*, t_in&)>;
+	using funkname = std::function<void(csp::channel<t_in,t_out>*, t_in&)>;
 	// madotsuki_eating_soup.jpg
-	using thistype = CSP::channel<
+	using thistype = csp::channel<
 		t_in, t_out,
 		funkname>;
 
@@ -121,14 +121,14 @@ CSP::channel
  * ================================================================
  */
 template <typename t_in, typename t_out>
-class chan_iter_t : public CSP::channel<
+class chan_iter_t : public csp::channel<
 		t_in, t_out,
 		std::function<t_out(t_in&)>>
 {
 public:
 	using funkname = std::function<t_out(t_in&)>;
-	// This is the type we want to be, a CSP pipe
-	using thistype = CSP::channel<
+	// This is the type we want to be, a csp pipe
+	using thistype = csp::channel<
 		t_in, t_out,
 		funkname>;
 
@@ -141,7 +141,7 @@ public:
 };
 // channel functor
 template <typename t_in, typename t_out>
-CSP::channel
+csp::channel
 <
 	t_in,
 	t_out,
@@ -153,7 +153,7 @@ CSP::channel
 {
 	using funkname = std::function<t_out(t_in&)>;
 	// madotsuki_eating_soup.jpg
-	using thistype = CSP::channel<
+	using thistype = csp::channel<
 		t_in, t_out,
 		funkname>;
 
@@ -175,14 +175,14 @@ CSP::channel
  * ================================================================
  */
 template <typename t_in>
-class chan_sans_output_read_t : public CSP::channel<
-		t_in, CSP::nothing,
+class chan_sans_output_read_t : public csp::channel<
+		t_in, csp::nothing,
 		std::function<void(t_in&)>>
 {
 public:
-	// This is the type we want to be, a CSP pipe
-	using thistype = CSP::channel<
-		t_in, CSP::nothing,
+	// This is the type we want to be, a csp pipe
+	using thistype = csp::channel<
+		t_in, csp::nothing,
 		std::function<void(t_in&)>>;
 
 	void run(std::function<void(t_in&)> a)
@@ -194,10 +194,10 @@ public:
 };
 // channel functor
 template <typename t_in>
-CSP::channel
+csp::channel
 <
 	t_in,
-	CSP::nothing,
+	csp::nothing,
 	std::function<void(t_in&)>
 >
 	chan_read(
@@ -206,8 +206,8 @@ CSP::channel
 {
 	// madotsuki_eating_soup.jpg
 	using funkname = std::function<void(t_in&)>;
-	using thistype = CSP::channel<
-		t_in, CSP::nothing,
+	using thistype = csp::channel<
+		t_in, csp::nothing,
 		funkname>;
 
 	thistype result;
@@ -219,7 +219,7 @@ CSP::channel
 	return result;
 } // chan_read
 
-} // namespace CSP
+} // namespace csp
 
 
 #endif /* READ_H_ */

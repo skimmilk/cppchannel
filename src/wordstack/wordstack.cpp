@@ -1,12 +1,7 @@
-#include <iostream>
-#include <string>
-#include <fstream>
-
 #include <csp/csplib.h>
 #include <csp/parallel.h>
 
-using namespace CSP;
-using std::string;
+using namespace csp;
 using std::vector;
 
 struct wordpair
@@ -58,13 +53,9 @@ CSP_DECL(genlist, nothing, wordpair, int)(int length)
 				// If previous is 'i', next will be 'in', 'is',...
 				for (auto& longer : dict[length-1])
 				{
-					// Read-only references avoids triggering copy-on-write
-					const char* str_short = shorter.word.c_str();
-					const char* str_long = longer.c_str();
-
 					int difference = 0;
 					for (int i = 0; i < length && difference <= 1; i++)
-						if (str_short[i-difference] != str_long[i])
+						if (shorter.word[i-difference] != longer[i])
 							difference++;
 
 					if (difference <= 1)
@@ -78,7 +69,7 @@ CSP_DECL(genlist, nothing, wordpair, int)(int length)
 
 int main(int argc, const char* argv[])
 {
-	string file = argc > 1? argv[1] : "/usr/share/dict/words";
+	const char* file = argc > 1? argv[1] : "/usr/share/dict/words";
 
 	cat(file) | grab("'", true) | to_lower() | sort<string>() |
 			uniq<string>() | elementize() >>= dict;

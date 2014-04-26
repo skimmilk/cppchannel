@@ -8,27 +8,30 @@
 #ifndef CSPLIB_H_
 #define CSPLIB_H_
 
-#include <string>
 #include <iostream>
-#include <strings.h>
+#include <fstream>
 
 #include <csp/pipe.h>
 #include <csp/read.h>
+#include <csp/string.h>
 
-namespace CSP{
+namespace csp{
 /* ================================
  * cat
  * Writes a file out line by line
- * Pipes that get called with no input __MUST__ have CSP::nothing as input
+ * Pipes that get called with no input __MUST__ have csp::nothing as input
  * ================================
  */
 //       name     input       output     arguments     (arguments)
-CSP_DECL(cat, CSP::nothing, std::string, std::string) (std::string file)
+CSP_DECL(cat, csp::nothing, csp::string, const char*)(const char* file)
 {
 	std::string line;
 	std::ifstream input(file);
 	while (std::getline(input, line))
-		put(line);
+	{
+		csp::string a (line);
+		put(a);
+	}
 } // cat
 
 /* ================================
@@ -36,9 +39,9 @@ CSP_DECL(cat, CSP::nothing, std::string, std::string) (std::string file)
  * Outputs input, but in lower case
  * ================================
  */
-CSP_DECL(to_lower, std::string, std::string) ()
+CSP_DECL(to_lower, csp::string, csp::string) ()
 {
-	std::string line;
+	csp::string line;
 	while (read(line))
 	{
 		std::transform(line.begin(), line.end(), line.begin(), ::tolower);
@@ -59,7 +62,7 @@ CSP_DECL(to_lower, std::string, std::string) ()
  * ================================
  */
 template <typename t_in>
-class sort_t_: public CSP::channel<t_in, t_in, bool>
+class sort_t_: public csp::channel<t_in, t_in, bool>
 {
 public:
 	void run(bool reverse)
@@ -86,9 +89,9 @@ public:
 	}
 };
 template <typename t_in>
-CSP::channel<t_in, t_in, bool> sort(bool a = false)
+csp::channel<t_in, t_in, bool> sort(bool a = false)
 {
-	return CSP::chan_create<
+	return csp::chan_create<
 			t_in, t_in, sort_t_<t_in>, bool>(a);
 }/* sort */
 
@@ -97,13 +100,13 @@ CSP::channel<t_in, t_in, bool> sort(bool a = false)
  * Writes out strings that contain the specified string
  * ================================
  */
-CSP_DECL(grab, std::string, std::string, std::string, bool)
-								(std::string search, bool invert)
+CSP_DECL(grab, csp::string, csp::string, const char*, bool)
+								(const char* search, bool invert)
 {
-	std::string current_line;
+	csp::string current_line;
 	while (read(current_line))
 		// Put string if the currently line contains search
-		if ((current_line.find(search) == std::string::npos) == invert)
+		if ((current_line.find(search) == csp::string::npos) == invert)
 			put(current_line);
 } // grab
 
@@ -113,7 +116,7 @@ CSP_DECL(grab, std::string, std::string, std::string, bool)
  * Only removes adjacent equivalent lines
  * ================================
  */
-template <typename t_in> class uniq_t : public CSP::channel<t_in,t_in>
+template <typename t_in> class uniq_t : public csp::channel<t_in,t_in>
 {
 public:
 	void run()
@@ -131,9 +134,9 @@ public:
 		}
 	}
 };
-template <typename t_in> CSP::channel<t_in, t_in> uniq()
+template <typename t_in> csp::channel<t_in, t_in> uniq()
 {
-	return CSP::chan_create<
+	return csp::chan_create<
 			t_in, t_in, uniq_t<t_in>>();
 }/* uniq */
 
@@ -142,18 +145,18 @@ template <typename t_in> CSP::channel<t_in, t_in> uniq()
  * Prints input stream to stdout
  * ================================
  */
-CSP_DECL(print, std::string, CSP::nothing)()
+CSP_DECL(print, csp::string, csp::nothing)()
 {
-	std::string line;
+	csp::string line;
 	while (read(line))
-		std::cout << line + "\n";
+		std::cout << line.append("\n");
 } // print
 // Prints to stderr
-CSP_DECL(print_log, std::string, CSP::nothing)()
+CSP_DECL(print_log, csp::string, csp::nothing)()
 {
-	std::string line;
+	csp::string line;
 	while (read(line))
-		std::cerr << line + "\n";
+		std::cerr << line.append("\n");
 } // print_log
 
 /* ================================
@@ -168,7 +171,7 @@ CSP_DECL(print_log, std::string, CSP::nothing)()
 // To avoid spamming thread locks uselessly, write less often
 template <typename t_in>
 class cat_generic : public
-	CSP::channel<CSP::nothing, t_in, std::vector<t_in>*>
+	csp::channel<csp::nothing, t_in, std::vector<t_in>*>
 {
 public:
 	void run(std::vector<t_in>* kitty)
@@ -178,21 +181,21 @@ public:
 	}
 };
 template <typename t_in>
-CSP::channel<CSP::nothing, t_in, std::vector<t_in>*>
+csp::channel<csp::nothing, t_in, std::vector<t_in>*>
 		vec(std::vector<t_in>& kitty)
 {
-	channel<CSP::nothing, t_in, std::vector<t_in>*> a;
+	channel<csp::nothing, t_in, std::vector<t_in>*> a;
 	a.arguments = std::make_tuple(&kitty);
 	// Fun fact: I figured out how to type this line
 	//  due to helpful compiler errors
 	a.start = (void(
-			channel<CSP::nothing,t_in,std::vector<t_in>*>::*)
+			channel<csp::nothing,t_in,std::vector<t_in>*>::*)
 		(std::vector<t_in>*))&cat_generic<t_in>::run;
 
 	return a;
 
 }/* vec */
 
-}; /* namespace CSP */
+}; /* namespace csp */
 
 #endif /* CSPLIB_H_ */

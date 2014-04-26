@@ -16,7 +16,7 @@
 
 #include <csp/spaghetti.h>
 
-namespace CSP{
+namespace csp{
 
 // Typical programming channel
 // Blocks reading till stuff is written

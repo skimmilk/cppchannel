@@ -15,7 +15,7 @@
 
 #include <csp/message_stream.h>
 
-namespace CSP
+namespace csp
 {
 
 struct nothing { char a; };
@@ -81,14 +81,14 @@ public:
 	bool read(t_in& input)
 	{
 		static_assert(!is_nothing<t_in>::value,
-				"Called read in CSP pipe without input");
+				"Called read in csp pipe without input");
 		return csp_input->read(input);
 	}
 	// Needed if multiple threads accessing this channel
 	bool safe_read(t_in& input)
 	{
 		static_assert(!is_nothing<t_in>::value,
-				"Called read in CSP pipe without input");
+				"Called read in csp pipe without input");
 		return csp_input->safe_read(input);
 	}
 

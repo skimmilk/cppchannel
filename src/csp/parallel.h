@@ -19,23 +19,23 @@
  */
 template <typename t_in, typename t_out, typename... args>
 class unordered_parallel_t : public
-	CSP::channel<
-		t_in, t_out,  int, CSP::channel<t_in,t_out,args...>*>
+	csp::channel<
+		t_in, t_out,  int, csp::channel<t_in,t_out,args...>*>
 {
 public:
-	void run(int threadcount, CSP::channel<t_in,t_out,args...>* channel)
+	void run(int threadcount, csp::channel<t_in,t_out,args...>* channel)
 	{
-		std::vector<CSP::channel<t_in,t_out,args...>> chans;
+		std::vector<csp::channel<t_in,t_out,args...>> chans;
 
 		chans.resize(threadcount);
 
 		for (auto& a : chans)
 		{
-			if (!CSP::is_nothing<t_out>::value)
+			if (!csp::is_nothing<t_out>::value)
 				this->csp_output->always_lock = true;
 			a.csp_output = this->csp_output;
 			a.unique_output = false;
-			a.csp_input = new CSP::message_stream<t_in>();
+			a.csp_input = new csp::message_stream<t_in>();
 			a.manage_input = true;
 
 			a.arguments = channel->arguments;
@@ -63,21 +63,21 @@ public:
 	}
 };
 template <typename t_in, typename t_out, typename... t_args>
-CSP::channel<
+csp::channel<
 	t_in, t_out, int,
-	CSP::channel<t_in,t_out,t_args...>*
+	csp::channel<t_in,t_out,t_args...>*
 	>
-	parallel(int numthreads, CSP::channel<t_in,t_out,t_args...>&& channel)
+	parallel(int numthreads, csp::channel<t_in,t_out,t_args...>&& channel)
 {
-	static_assert(!CSP::is_nothing<t_in>::value,
+	static_assert(!csp::is_nothing<t_in>::value,
 			"parallel needs an input channel");
 
-	using type = CSP::channel<
-			t_in,t_out,int,CSP::channel<t_in,t_out,t_args...>*>;
+	using type = csp::channel<
+			t_in,t_out,int,csp::channel<t_in,t_out,t_args...>*>;
 
 	type a;
 	a.arguments = std::make_tuple(numthreads, &channel);
-	a.start = (void(type::*)(int, CSP::channel<t_in,t_out,t_args...>*))
+	a.start = (void(type::*)(int, csp::channel<t_in,t_out,t_args...>*))
 			&unordered_parallel_t<t_in,t_out,t_args...>::run;
 	return a;
 
