@@ -60,23 +60,18 @@ public:
 	{
 		return this->size();
 	}
-	const char* c_str()
+	size_t find(const std::string& str) const
 	{
-		// Ensure data is null-terminated
-		push_back(0);
-		pop_back();
-		return this->_M_impl._M_start;
+		return std_string().find(str);
 	}
-	size_t find(string& str)
+	size_t find(const string& str) const
 	{
-		return find(str.c_str());
+		return find(str.std_string());
 	}
-	size_t find(const char* str)
+	size_t find(const char* str) const
 	{
-		const char* ret = strstr(c_str(), str);
-		if (ret == 0)
-			return npos;
-		return ret - c_str();
+		std::string a (str);
+		return find(a);
 	}
 	string substr(size_t pos = 0, size_t len = npos) const
 	{
@@ -86,13 +81,18 @@ public:
 			a.push_back(this->at(i));
 		return a;
 	}
-	int compare(string& str)
+	int compare(const std::string& str) const
 	{
-		return strcmp(c_str(), str.c_str());
+		return std_string().compare(str);
 	}
-	int compare(const char* str)
+	int compare(const string& str) const
 	{
-		return strcmp(c_str(), str);
+		return compare(str.std_string());
+	}
+	int compare(const char* str) const
+	{
+		std::string a (str);
+		return compare(a);
 	}
 	void assign(const string& str)
 	{
@@ -111,9 +111,9 @@ public:
 		for (auto a : str)
 			push_back(a);
 	}
-	std::string std_string()
+	std::string std_string() const
 	{
-		std::string a (c_str());
+		std::string a (this->begin(), this->end());
 		return a;
 	}
 };
@@ -124,7 +124,7 @@ std::istream& operator>> (std::istream& is, string& str)
 	str.assign(a);
 	return is;
 }
-std::ostream& operator<< (std::ostream& os, string& str)
+std::ostream& operator<< (std::ostream& os, const string& str)
 {
 	os << str.std_string();
 	return os;

@@ -29,7 +29,6 @@ class channel
 private:
 	// Wait to write till this is filled
 	std::thread worker;
-	std::mutex safelock;
 
 public:
 	bool background;
