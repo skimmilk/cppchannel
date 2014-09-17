@@ -19,14 +19,32 @@ namespace csp{
 /* ================================
  * cat
  * Writes a file out line by line
+ * Sets value error to non-zero value if an error occurred, zero if OK
  * Pipes that get called with no input __MUST__ have csp::nothing as input
  * ================================
  */
-//       name     input       output     arguments     (arguments)
-CSP_DECL(cat, csp::nothing, csp::string, const char*)(const char* file)
+//       name     input       output     arguments          (arguments)
+CSP_DECL(cat, csp::nothing, csp::string, const char*, int*)
+												(const char* file, int* error)
 {
 	std::string line;
 	std::ifstream input(file);
+
+	// Check for errors
+	// The CSP library does not implement fancy error propagation techniques
+	// There is no way for channels sending input to or listening for output
+	//   to know an error has occurred that has broken the pipeline, much
+	//   like the Unix counterpart.
+	// It would be unwise to use pass exceptions beyond the CSP function because
+	//   the listening channels would not be able to catch and clean up properly
+	if (input.fail())
+	{
+		*error = 1;
+		return;
+	}
+	else
+		*error = 0;
+
 	while (std::getline(input, line))
 	{
 		csp::string a (line);

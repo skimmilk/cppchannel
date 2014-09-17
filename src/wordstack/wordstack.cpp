@@ -71,8 +71,15 @@ int main(int argc, const char* argv[])
 {
 	const char* file = argc > 1? argv[1] : "/usr/share/dict/words";
 
-	cat(file) | grab("'", true) | to_lower() | sort<string>() |
+	int error = 0;
+	cat(file, &error) | grab("'", true) | to_lower() | sort<string>() |
 			uniq<string>() | elementize() >>= dict;
+
+	if (error)
+	{
+		std::cerr << "Could not open dictionary file " << file << "\n";
+		return 1;
+	}
 
 	genlist(9) |
 			chan_iter<wordpair,string>(
