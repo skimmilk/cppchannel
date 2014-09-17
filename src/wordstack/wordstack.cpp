@@ -71,7 +71,7 @@ int main(int argc, const char* argv[])
 {
 	const char* file = argc > 1? argv[1] : "/usr/share/dict/words";
 
-	int error = 0;
+	std::atomic<int> error (0);
 	cat(file, &error) | grab("'", true) | to_lower() | sort<string>() |
 			uniq<string>() | elementize() >>= dict;
 

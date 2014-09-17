@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <atomic>
 
 #include <csp/pipe.h>
 #include <csp/read.h>
@@ -20,12 +21,14 @@ namespace csp{
  * cat
  * Writes a file out line by line
  * Sets value error to non-zero value if an error occurred, zero if OK
+ * The error code must be atomic because the calling thread is different
+ *   from the channel thread.
  * Pipes that get called with no input __MUST__ have csp::nothing as input
  * ================================
  */
 //       name     input       output     arguments          (arguments)
-CSP_DECL(cat, csp::nothing, csp::string, const char*, int*)
-												(const char* file, int* error)
+CSP_DECL(cat, csp::nothing, csp::string, const char*, std::atomic<int>*)
+												(const char* file, std::atomic<int>* error)
 {
 	std::string line;
 	std::ifstream input(file);
