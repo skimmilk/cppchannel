@@ -13,192 +13,276 @@
 #include <vector>
 #include <list>
 #include <atomic>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 #include <csp/spaghetti.h>
 
 namespace csp{
 
 // Typical programming channel
-// Blocks reading till stuff is written
-// Never blocks writes!
-// Cache isn't implemented here because it would require the holder
-//  of input and output channels to know the cache sizes of each other
+// Blocks reading till stuff is written to the channel
+// A stream will have readers and writers accessing through different threads
+// This tries to not use locks when necessary, for performance
 template<typename T>
 class message_stream
 {
 private:
-	std::mutex wait_lock_m;
-	// Locked when reading/writing
-	std::mutex flush;
-	std::unique_lock<std::mutex> wait_lock_ml;
-	std::list<std::array<T, CSP_CACHE_DEFAULT>> list;
-	int readhead, writehead;
-	int listsiz;
+	// These are the indexes to where we are reading/writing in the cache
+	uint32_t readhead, writehead;
+	std::atomic<uint32_t> writehead_finished;
+
+	// This is where the items are stored to be read
+	// The linked list stores an array of data, the cache
+	// The cache is used because the list must be locked
+	//   every time it is written to and locking on every write is expensive
+	// ===== -> ===== -> ===== -> ===-- -> 0
+	typedef std::array<T, CSP_CACHE_DEFAULT> stream_cache;
+	std::list<stream_cache> list;
+
+	// Since the variable isn't atomic, and we want the length to be accurate
+	// This mutex must be locked every time the list is written
+	size_t list_size;
+	std::mutex list_lock;
+
+	// Used by wait_lock to block and resume
+	std::mutex wait_lock_ml;
+
+	// This is locked when a thread is waiting for input
+	std::mutex waiting;
 public:
 	T last_read;
-	// Wait on this for input
+
+	// Wait on this for input if we are waiting for writes
 	std::condition_variable wait_lock;
 
-	std::atomic_bool finished;
-	std::mutex waiting;
+	std::mutex read_lock;
 
-	// Set true to always lock on read/write
+	// This is a hint, namely from parallel.h functions,
+	//   that this should always lock when writing items
 	bool always_lock;
+
+	std::atomic_bool finished;
 
 	message_stream()
 	{
+		readhead = writehead = 0;
+		writehead_finished = 0;
 		always_lock = false;
-		readhead = listsiz = writehead = 0;
 		finished = false;
-		wait_lock_ml = std::unique_lock<std::mutex>(wait_lock_m);
+		list_size = 0;
 	}
 
-	// Returns true if we need another go-around
-	bool do_read(bool dolock)
+	// False if this thread owns main lock
+	bool check_lock()
+	{
+		return (list_lock.native_handle()->__data.__owner != syscall(SYS_gettid));
+	}
+	// Returns true if there are items remaining in the list
+	// Assumes mutex is locked
+	bool items_remaining()
+	{
+		bool converged = (list_size == 1 && readhead == writehead_finished);
+		if (finished)
+			// Finished if list size is zero or reading/writing elements same
+			return !(converged || list_size == 0);
+		return true;
+	}
+
+	// Returns false if item could not be read safely
+	// True on success
+	bool read_list(bool locked)
 	{
 		if (readhead == CSP_CACHE_DEFAULT)
 		{
-			if (dolock)
-				lock_this();
-
 			readhead = 0;
+			if (!locked)
+				lock_this();
 			list.pop_front();
-			listsiz--;
+			list_size--;
 
-			if (dolock)
+			if (!locked)
+				assert(list_size >= 1);
+
+			if (!locked)
 				unlock_this();
-			return true;
 		}
+
+		if (list_size == 0 || (list_size == 1 && readhead >= writehead))
+			return false;
+
 		last_read = list.front()[readhead++];
-		return false;
+		return true;
 	}
-
-	bool safe_read()
+	// Returns true on success, false on failure
+	// Will not read and fail if there are not enough entries in the list
+	// The locked variable tells us if the list mutex is locked
+	// If it is locked, we should not lock it again to prevent deadlocks
+	bool do_read_simple(bool locked)
 	{
-		retry_wlock:
-		lock_this();
-		retry:
+		// The list is empty or may not fully populated
+		// If the list is not fully populated we might read uncommitted items
+		//   in the cache in the list
+		if (list_size <= 2)
+			return false;
 
-		if (listsiz == 0)
-			if (finished)
-				return false;
-			else
+		return read_list(locked);
+	}
+	// Reads items from the cache that may not be fully populated
+	// Assumes mutex is locked, items remain, and list size is 1 or 0
+	// Returns true if read success, false if no items remain in list
+	bool do_read_tight()
+	{
+		if (list_size == 0 || readhead == writehead)
+		{
+			wait:
+			unlock_this();
+			wait_write();
+			lock_this();
+
+			if (!items_remaining())
 			{
 				unlock_this();
-				wait_write();
-				goto retry_wlock;
+				return false;
 			}
-		// If we are down to one cache, think carefully about read/write heads
-		else if (listsiz == 1)
-		{
-			if (readhead >= writehead)
-				if (finished)
-					return false;
-				else
-				{
-					unlock_this();
-					wait_write();
-					goto retry_wlock;
-				}
-			else
-				if (do_read(false))
-					goto retry;
 		}
-		// We have more than one cache remaining in list
-		else
-			if (do_read(false))
-				goto retry;
-		unlock_this();
-
+		assert(list_size != 0);
+		if (!read_list(true))
+			goto wait;
 		return true;
 	}
+	// Returns false if there are no items left
+	bool safe_read(T& t)
+	{
+		lock_this();
 
+		if (!do_read_simple(true))
+		{
+			// Are we finished?
+			if (!items_remaining() || !do_read_tight())
+			{
+				unlock_this();
+				return false;
+			}
+		}
+
+		t = last_read;
+		unlock_this();
+		assert(check_lock());
+		return true;
+	}
+	// Returns false if no items remaining to read
 	bool read(T& t)
 	{
-		// Avoid locking, if list has plenty of data,
-		// the data has been written back and is safe to read
-		// We will lock if it is possible writes are messing with head of list
-		retry:
-		if (!always_lock && listsiz > 2)
-		{
-			if (do_read(true))
-				goto retry;
-		}
-		else if (!safe_read())
-			return false;
+		if (!do_read_simple(false))
+			return safe_read(t);
 		t = last_read;
+		assert(check_lock());
 		return true;
 	}
 
-	void do_write(const T& t, bool dolock)
+	void do_write(const T& t, bool locked)
 	{
+		// Is the list empty?
+		if (list_size == 0)
+		{
+			if (!locked)
+				lock_this();
+			list.resize(1);
+			if (!locked)
+				unlock_this();
+			assert(writehead == 0);
+		}
+		// Is the cache full?
 		if (writehead == CSP_CACHE_DEFAULT)
 		{
-			if (dolock)
-				lock_this();
-			std::array<T, CSP_CACHE_DEFAULT> adder;
-			list.push_back(adder);
-			listsiz++;
 			writehead = 0;
 
-			if (dolock)
-				unlock_this();
+			// Add in another cache in the list
+			if (!locked)
+				lock_this();
 
-			// Threads will only be waiting on this read
-			//   if the size is 0, 1, or 2
-			if (listsiz < 3)
+			stream_cache tmp;
+			list.push_back(tmp);
+			list_size++;
+
+			assert(list_size > 1);
+
+			// Because readers might be waiting, we will want to message to
+			//   those waiting every so often and now is a good opportunity
+			if (!locked)
+				unlock_write();
+			else
+				// We are locked but still want to message
 				wait_lock.notify_all();
 		}
+		// This go last because list_size gets updated during the lock
+		// write() needs this updated variable so we don't have an old value
+		//   and write to the front of the list
 		list.back()[writehead++] = t;
 	}
+	// Will safely write the item to the list
 	void safe_write(const T& t)
 	{
 		lock_this();
-		// Keep track if we are in a thread-safe mode
-		if (listsiz == 0)
+
+		// If the list is empty
+		if (list_size == 0)
 		{
 			list.resize(1);
-			listsiz++;
+			list_size++;
 			writehead = 0;
 		}
-		do_write(t, false);
-		unlock_this();
+		do_write(t, true);
+
+		unlock_write();
 	}
+	// Returns true on success, false on failure
+	// Write item to the stream
 	void write(const T& t)
 	{
-		// We will lock if writing will mess with the head of the list
-		if (!always_lock && listsiz > 2)
-			do_write(t, true);
-		else
+		// Be sure to safely write when there are few items in the list
+		//   as the front of the list will be written to
+		//   and there might be a reader waiting
+		if (always_lock || list_size <= 2)
 			safe_write(t);
+		else
+			do_write(t, false);
+		assert(check_lock());
 	}
 
 	void done()
 	{
 		finished = true;
+		writehead_finished = writehead;
+		list_lock.try_lock();
+		list_lock.unlock();
 		waiting.try_lock();
 		wait_lock.notify_all();
 	}
 
 	void lock_this()
 	{
-		flush.lock();
+		// Make sure we aren't locking a lock we already locked and causing a deadlock
+		assert(check_lock());
+		list_lock.lock();
 	}
 	void unlock_this()
 	{
-		flush.unlock();
+		list_lock.unlock();
 	}
-
 	void unlock_write()
 	{
-		flush.unlock();
+		list_lock.unlock();
 		wait_lock.notify_all();
 	}
 	void wait_write()
 	{
 		if (!waiting.try_lock())
 			return;
-		wait_lock.wait(wait_lock_ml);
+		// Halt until a writer unlocks us
+		std::unique_lock<std::mutex> ul (wait_lock_ml);
+		wait_lock.wait(ul);
 		waiting.unlock();
 	}
 };
