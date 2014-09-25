@@ -48,8 +48,8 @@ private:
 	// Used by wait_lock to block and resume
 	std::mutex wait_lock_ml;
 
-	// This is locked when a thread is waiting for input
-	std::mutex waiting;
+	// A thread is waiting for input in wait_write()
+	std::atomic<bool> waiting;
 public:
 	T last_read;
 
@@ -253,12 +253,10 @@ public:
 
 	void done()
 	{
-		finished = true;
 		writehead_finished = writehead;
-		list_lock.try_lock();
-		list_lock.unlock();
-		waiting.try_lock();
-		wait_lock.notify_all();
+		finished = true;
+		while (waiting)
+			wait_lock.notify_all();
 	}
 
 	void lock_this()
@@ -278,12 +276,17 @@ public:
 	}
 	void wait_write()
 	{
-		if (!waiting.try_lock())
+		waiting = true;
+		if (finished)
+		{
+			waiting = false;
 			return;
+		}
+
 		// Halt until a writer unlocks us
 		std::unique_lock<std::mutex> ul (wait_lock_ml);
 		wait_lock.wait(ul);
-		waiting.unlock();
+		waiting = false;
 	}
 };
 
