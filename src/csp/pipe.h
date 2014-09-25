@@ -81,6 +81,16 @@ public:
 	{
 		static_assert(!is_nothing<t_in>::value,
 				"Called read in csp pipe without input");
+
+		// Simple spinlock, wait for input to update
+		while (!csp_input)
+		{
+			std::mutex barrier;
+			barrier.lock();
+			if (csp_input) {barrier.unlock(); break;}
+			barrier.unlock();
+		}
+
 		return csp_input->read(input);
 	}
 	// Needed if multiple threads accessing this channel
@@ -88,6 +98,15 @@ public:
 	{
 		static_assert(!is_nothing<t_in>::value,
 				"Called read in csp pipe without input");
+
+		while (!csp_input)
+		{
+			std::mutex barrier;
+			barrier.lock();
+			if (csp_input) {barrier.unlock(); break;}
+			barrier.unlock();
+		}
+
 		return csp_input->safe_read(input);
 	}
 
@@ -151,10 +170,16 @@ public:
 	channel<ot_in, ot_out, ot_args...>&
 		operator |(channel<ot_in,ot_out,ot_args...>&& pipe)
 	{
+		// Force all writes to RAM
+		std::mutex a;
+		a.lock();
+
 		// this = left, pipe = right
 		background = true;
 		pipe.background = true;
 		pipe.csp_input = csp_output;
+
+		a.unlock();
 
 		// Right hand side doesn't output?
 		// Block further execution so we don't run over statements like
