@@ -71,13 +71,9 @@ public:
 		always_lock = false;
 		finished = false;
 		list_size = 0;
+		waiting = false;
 	}
 
-	// False if this thread owns main lock
-	bool check_lock()
-	{
-		return (list_lock.native_handle()->__data.__owner != syscall(SYS_gettid));
-	}
 	// Returns true if there are items remaining in the list
 	// Assumes mutex is locked
 	bool items_remaining()
@@ -168,7 +164,6 @@ public:
 
 		t = last_read;
 		unlock_this();
-		assert(check_lock());
 		return true;
 	}
 	// Returns false if no items remaining to read
@@ -177,7 +172,6 @@ public:
 		if (!do_read_simple(false))
 			return safe_read(t);
 		t = last_read;
-		assert(check_lock());
 		return true;
 	}
 
@@ -248,7 +242,6 @@ public:
 			safe_write(t);
 		else
 			do_write(t, false);
-		assert(check_lock());
 	}
 
 	void done()
@@ -261,8 +254,6 @@ public:
 
 	void lock_this()
 	{
-		// Make sure we aren't locking a lock we already locked and causing a deadlock
-		assert(check_lock());
 		list_lock.lock();
 	}
 	void unlock_this()
