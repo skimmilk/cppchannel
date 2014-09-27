@@ -44,7 +44,7 @@ csp::channel
 	t_in,
 	std::function<bool(t_in&)>
 >
-	chan_readwrite(
+	chan_select(
 		std::function<bool(t_in&)>
 					asdf)
 {
