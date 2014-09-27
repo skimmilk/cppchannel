@@ -27,6 +27,10 @@ public:
 	{
 		assign(a);
 	}
+	string(const char* a, size_t s)
+	{
+		assign(a, s);
+	}
 	string(const std::string& a)
 	{
 		assign(a);
@@ -105,6 +109,11 @@ public:
 			push_back(*a);
 			a++;
 		}
+	}
+	void assign(const char* a, size_t l)
+	{
+		for (size_t i = 0; i < l; i++)
+			push_back(a[i]);
 	}
 	void assign(const std::string& str)
 	{
