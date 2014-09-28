@@ -208,7 +208,7 @@ public:
 				unlock_write();
 			else
 				// We are locked but still want to message
-				wait_lock.notify_all();
+				notify_readers();
 		}
 		// This go last because list_size gets updated during the lock
 		// write() needs this updated variable so we don't have an old value
@@ -260,10 +260,15 @@ public:
 	{
 		list_lock.unlock();
 	}
+	void notify_readers()
+	{
+		if (waiting)
+			wait_lock.notify_all();
+	}
 	void unlock_write()
 	{
 		list_lock.unlock();
-		wait_lock.notify_all();
+		notify_readers();
 	}
 	void wait_write()
 	{
