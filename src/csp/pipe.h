@@ -148,7 +148,7 @@ public:
 		call(do_start_actually, thisargs);
 
 		// Finished processing input
-		if (!is_nothing<t_out>::value)
+		if (!is_nothing<t_out>::value && unique_output)
 			csp_output->done();
 		return true;
 	}
