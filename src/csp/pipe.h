@@ -26,11 +26,10 @@ template <typename t_in, typename t_out, typename... t_args>
 class channel
 {
 	using this_pipe = channel<t_in,t_out,t_args...>;
-private:
+public:
 	// Wait to write till this is filled
 	std::thread worker;
 
-public:
 	bool background;
 	bool manage_input;
 	message_stream<t_in>* csp_input;
@@ -45,15 +44,11 @@ public:
 	// Specifically fixes chan_read
 	std::tuple<t_args...> arguments;
 
-	channel()
+	channel() : background(false), manage_input(false), csp_input(NULL),
+			unique_output(true), csp_output(NULL)
 	{
-		manage_input = false;
-		unique_output = true;
 		if (!is_nothing<t_out>::value)
 			csp_output = new message_stream<t_out>();
-
-		background = false;
-		csp_input = 0;
 	}
 	// Wait to finish first, then exit to self-destruct
 	~channel()
@@ -65,6 +60,16 @@ public:
 			delete csp_output;
 		if (!is_nothing<t_in>::value && manage_input)
 			delete csp_input;
+	}
+	// Copy constructor, needed for csp_create...
+	channel(const this_pipe& src)
+	{
+		manage_input = src.manage_input;
+		unique_output = src.unique_output;
+		csp_output = src.csp_output;
+		csp_input = src.csp_input;
+		background = src.background;
+		start = src.start;
 	}
 
 	void put(const t_out& out)
@@ -110,17 +115,6 @@ public:
 		return csp_input->safe_read(input);
 	}
 
-	// Copy constructor, won't compile without this
-	// Needed for csp_create...
-	// Never actually gets called just put stuff here to stop compiler warnings
-	channel(const channel& src)
-	{
-		manage_input = src.manage_input;
-		unique_output = src.unique_output;
-		csp_output = src.csp_output;
-		csp_input = src.csp_input;
-		background = src.background;
-	}
 	/* DO NOT TOUCH */
 public:
 	void(this_pipe::*start)(t_args...)= 0;
@@ -157,7 +151,7 @@ public:
 		background = true;
 		worker = std::thread(begin_background, this);
 	}
-private:
+
 	// Called by worker thread only, runs the runner
 	static void begin_background(this_pipe* a)
 	{
