@@ -11,6 +11,7 @@
 #include <atomic>
 #include <stdio.h>
 #include <csp/pipe.h>
+#include <sys/wait.h>
 
 namespace csp{
 
@@ -53,13 +54,13 @@ void close_files()
 }
 // Closes all open file descriptors and fires command
 // Returns error
-int fire_and_forget(const char* cmd, const char* flags, FILE** fp)
+int fire_and_forget(const char* cmd, const char* flags, FILE** fp, pid_t& pid)
 {
 	int pipes[2];
 	if (pipe(pipes))
 		return 1;
 
-	auto pid = fork();
+	pid = fork();
 	if (pid == -1)
 		return 2;
 
@@ -109,12 +110,14 @@ CSP_DECL(exec_r, csp::nothing, csp::string,
 {
 	// Open command for reading
 	FILE* fp;
-	if ((*error = fire_and_forget(cmd, "r", &fp)) || !fp)
+	pid_t pid;
+	if ((*error = fire_and_forget(cmd, "r", &fp, pid)) || !fp)
 		return;
 
 	read_file_to(fp, this->csp_output);
 	if (pclose(fp))
 		*error = 2;
+	waitpid(pid, NULL, 0);
 }
 
 // Run a program and write to its input
@@ -124,24 +127,26 @@ CSP_DECL(exec_w, csp::string, csp::nothing,
 {
 	// Open command for writing
 	FILE* fp;
-	if ((*error = fire_and_forget(cmd, "w", &fp)) || !fp)
+	pid_t pid;
+	if ((*error = fire_and_forget(cmd, "w", &fp, pid)) || !fp)
 		return;
 
 	write_file_from(fp, this->csp_input);
 	if (pclose(fp))
 		*error = 2;
+	waitpid(pid, NULL, 0);
 }
 
 // http://dzone.com/snippets/simple-popen2-implementation
 // Bi-directional popen
-int bipopen(const char *command, int *infp, int *outfp)
+int bipopen(const char *command, int *infp, int *outfp, pid_t& pid)
 {
 	int p_stdin[2], p_stdout[2];
 
 	if (pipe(p_stdin) || pipe(p_stdout))
 		return 1;
 
-	auto pid = fork();
+	pid = fork();
 
 	if (pid == -1)
 		return 2;
@@ -179,7 +184,8 @@ CSP_DECL(exec_rw, csp::string, csp::string,
 (const char* cmd, std::atomic<int>* error)
 {
 	int infd, outfd;
-	if ((*error = bipopen(cmd, &infd, &outfd)))
+	pid_t pid;
+	if ((*error = bipopen(cmd, &infd, &outfd, pid)))
 		return;
 	FILE* infp = fdopen(infd, "w");
 
@@ -195,6 +201,7 @@ CSP_DECL(exec_rw, csp::string, csp::string,
 	write_file_from(infp, csp_input);
 	pclose(infp);
 	thread.join();
+	waitpid(pid, NULL, 0);
 }
 
 } /* namespace csp */
