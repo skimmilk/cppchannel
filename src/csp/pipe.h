@@ -37,6 +37,9 @@ public:
 	bool unique_output;
 	message_stream<t_out>* csp_output;
 
+	// The function pointer member to the function that this channel runs
+	void(this_pipe::*start)(t_args...) = 0;
+
 	// Variable length...
 	// Putting this last allows for self-referential pipes to be called
 	//   through a pointer without knowing the size of the member to align
@@ -116,8 +119,6 @@ public:
 	}
 
 	/* DO NOT TOUCH */
-public:
-	void(this_pipe::*start)(t_args...)= 0;
 private:
 	void do_start_actually_really(t_args&... a)
 	{

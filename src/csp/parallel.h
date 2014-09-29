@@ -33,6 +33,8 @@ public:
 		{
 			if (!csp::is_nothing<t_out>::value)
 				this->csp_output->always_lock = true;
+			delete a.csp_output;
+			delete a.csp_input;
 			a.csp_output = this->csp_output;
 			a.unique_output = false;
 			a.csp_input = new csp::message_stream<t_in>();
@@ -106,6 +108,7 @@ public:
 			// Create the channel and set it up
 			channels.push_back(new created_channel_t(functor(in)));
 			channels.back()->unique_output = false;
+			delete channels.back()->csp_output;
 			channels.back()->csp_output = this->csp_output;
 			channels.back()->background = true;
 
