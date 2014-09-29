@@ -51,10 +51,10 @@ CSP_DECL(genlist, nothing, wordpair, int)(int length)
 			{
 				// Try to get a word that differs in one character
 				// If previous is 'i', next will be 'in', 'is',...
-				for (auto& longer : dict[length-1])
+				for (const auto& longer : dict[length-1])
 				{
 					int difference = 0;
-					for (int i = 0; i < length && difference <= 1; i++)
+					for (int i = 0; difference <= 1 && i < length - 1 + difference; i++)
 						if (shorter.word[i-difference] != longer[i])
 							difference++;
 
