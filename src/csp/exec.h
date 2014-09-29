@@ -27,6 +27,8 @@ void read_file_to(FILE* fp, message_stream<csp::string>* writeto)
 			amt--;
 		writeto->write(csp::string (line, amt));
 	}
+	if (line)
+		free(line);
 }
 // Reads from message_stream into FILE
 void write_file_from(FILE* fp, message_stream<csp::string>* readfrom)
@@ -168,7 +170,7 @@ void _bg_read(int fd, message_stream<csp::string>* stream)
 {
 	FILE* fp = fdopen(fd, "r");
 	read_file_to(fp, stream);
-	close(fd);
+	pclose(fp);
 }
 // Run a program and read from and write to it
 // cat(something) | exec_rw("grep stuff") | print();
@@ -191,7 +193,7 @@ CSP_DECL(exec_rw, csp::string, csp::string,
 
 	auto thread = std::thread(_bg_read, outfd, csp_output);
 	write_file_from(infp, csp_input);
-	close(infd);
+	pclose(infp);
 	thread.join();
 }
 
