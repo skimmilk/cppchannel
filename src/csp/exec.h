@@ -41,18 +41,74 @@ void write_file_from(FILE* fp, message_stream<csp::string>* readfrom)
 	}
 }
 
+// All open file descriptors need to be closed in the child process
+void close_files()
+{
+	// Close all that isn't STDIN or STDOUT
+	int maxfd=sysconf(_SC_OPEN_MAX);
+	for(int fd=3; fd<maxfd; fd++)
+		close(fd);
+}
+// Closes all open file descriptors and fires command
+// Returns error
+int fire_and_forget(const char* cmd, const char* flags, FILE** fp)
+{
+	int pipes[2];
+	if (pipe(pipes))
+		return 1;
+
+	auto pid = fork();
+	if (pid == -1)
+		return 2;
+
+	// Child
+	if (!pid)
+	{
+		if (*flags == 'r')
+		{
+			close(pipes[0]);
+			if (pipes[1] != STDOUT_FILENO)
+			{
+				dup2(pipes[1], STDOUT_FILENO);
+				close(pipes[1]);
+			}
+		}
+		else
+		{
+			close(pipes[1]);
+			if (pipes[0] != STDIN_FILENO)
+			{
+				dup2(pipes[0], STDIN_FILENO);
+				close(pipes[0]);
+			}
+		}
+		close_files();
+		execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
+		perror("Could not run command");
+	}
+	// Parent
+	if (*flags == 'r')
+	{
+		*fp = fdopen(pipes[0], flags);
+		close(pipes[1]);
+	}
+	else
+	{
+		*fp = fdopen(pipes[1], flags);
+		close(pipes[0]);
+	}
+
+	return 0;
+}
 // Run a program and read its output
 CSP_DECL(exec_r, csp::nothing, csp::string,
 		const char*, std::atomic<int>*)
 (const char* cmd, std::atomic<int>* error)
 {
 	// Open command for reading
-	FILE* fp = popen(cmd, "r");
-	if (!fp)
-	{
-		*error = 1;
+	FILE* fp;
+	if ((*error = fire_and_forget(cmd, "r", &fp)) || !fp)
 		return;
-	}
 
 	read_file_to(fp, this->csp_output);
 	if (pclose(fp))
@@ -65,12 +121,9 @@ CSP_DECL(exec_w, csp::string, csp::nothing,
 (const char* cmd, std::atomic<int>* error)
 {
 	// Open command for writing
-	FILE* fp = popen(cmd, "w");
-	if (!fp)
-	{
-		*error = 1;
+	FILE* fp;
+	if ((*error = fire_and_forget(cmd, "w", &fp)) || !fp)
 		return;
-	}
 
 	write_file_from(fp, this->csp_input);
 	if (pclose(fp))
@@ -96,6 +149,8 @@ int bipopen(const char *command, int *infp, int *outfp)
 		dup2(p_stdin[STDIN_FILENO], STDIN_FILENO);
 		close(p_stdout[STDIN_FILENO]);
 		dup2(p_stdout[STDOUT_FILENO], STDOUT_FILENO);
+
+		close_files();
 
 		execl("/bin/sh", "/bin/sh", "-c", command, NULL);
 		exit(1);
