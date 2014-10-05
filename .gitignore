@@ -34,3 +34,5 @@ Release
 build/
 .project
 cspcpp
+exectest
+
