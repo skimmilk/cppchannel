@@ -14,11 +14,11 @@ csp::channel<t_in, t_in, CSP_CACHE_DEFAULT, bool> sort(bool a = false)
 
 
 #define CSP_DECL_TEMPL_INIT(fn_name,templed_name,input,output,...)\
-	csp::channel<input,output,##__VA_ARGS__> (*fn_name)(__VA_ARGS__) =\
+	csp::shared_ptr<csp::channel<input,output,##__VA_ARGS__>> (*fn_name)(__VA_ARGS__) =\
 	csp::chan_create<input,output,templed_name,##__VA_ARGS__>;
 
 #define CSP_DECL_INITIALIZER(fn_name,input,output,...)\
-	csp::channel<input,output,##__VA_ARGS__> (*fn_name)(__VA_ARGS__) =\
+	csp::shared_ptr<csp::channel<input,output,##__VA_ARGS__>> (*fn_name)(__VA_ARGS__) =\
 	csp::chan_create<input,output,_##fn_name##_t_,##__VA_ARGS__>;
 
 #define CSP_DECL(fn_name,input,output,...)\

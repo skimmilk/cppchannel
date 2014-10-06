@@ -38,12 +38,12 @@ public:
 };
 // channel functor
 template <typename t_in>
-csp::channel
+csp::shared_ptr<csp::channel
 <
 	t_in,
 	t_in,
 	std::function<bool(t_in&)>
->
+>>
 	chan_select(
 		std::function<bool(t_in&)>
 					asdf)
@@ -52,10 +52,10 @@ csp::channel
 	using thistype = csp::channel<
 		t_in, t_in,
 		funkname>;
-	thistype result;
+	auto result = csp::make_shared<thistype>();
 
-	result.arguments = std::make_tuple(asdf);
-	result.start = (void(thistype::*)(funkname))
+	result->arguments = std::make_tuple(asdf);
+	result->start = (void(thistype::*)(funkname))
 			&chan_select_t<t_in>::run;
 
 	return result;
@@ -88,12 +88,12 @@ public:
 };
 // channel functor
 template <typename t_in, typename t_out>
-csp::channel
+csp::shared_ptr<csp::channel
 <
 	t_in,
 	t_out,
 	std::function<void(t_in&)>
->
+>>
 	chan_readwrite(
 		std::function<void(csp::channel<t_in,t_out>*, t_in&)>
 					asdf)
@@ -104,10 +104,10 @@ csp::channel
 		t_in, t_out,
 		funkname>;
 
-	thistype result;
+	auto result = csp::make_shared<thistype>();
 
-	result.arguments = std::make_tuple(asdf);
-	result.start = (void(thistype::*)(funkname))
+	result->arguments = std::make_tuple(asdf);
+	result->start = (void(thistype::*)(funkname))
 			&chan_readwrite_t<t_in,t_out>::run;
 
 	return result;
@@ -141,12 +141,12 @@ public:
 };
 // channel functor
 template <typename t_in, typename t_out>
-csp::channel
+csp::shared_ptr<csp::channel
 <
 	t_in,
 	t_out,
 	std::function<t_out(t_in&)>
->
+>>
 	chan_iter(
 		std::function<t_out(t_in&)>
 					asdf)
@@ -157,10 +157,10 @@ csp::channel
 		t_in, t_out,
 		funkname>;
 
-	thistype result;
+	auto result = csp::make_shared<thistype>();
 
-	result.arguments = std::make_tuple(asdf);
-	result.start = (void(thistype::*)(funkname))
+	result->arguments = std::make_tuple(asdf);
+	result->start = (void(thistype::*)(funkname))
 			&chan_iter_t<t_in,t_out>::run;
 
 	return result;
@@ -194,12 +194,12 @@ public:
 };
 // channel functor
 template <typename t_in>
-csp::channel
+csp::shared_ptr<csp::channel
 <
 	t_in,
 	csp::nothing,
 	std::function<void(t_in&)>
->
+>>
 	chan_read(
 		std::function<void(t_in&)>
 					asdf)
@@ -210,10 +210,10 @@ csp::channel
 		t_in, csp::nothing,
 		funkname>;
 
-	thistype result;
+	auto result = csp::make_shared<thistype>();
 
-	result.arguments = std::make_tuple(asdf);
-	result.start = (void (thistype::*)(funkname))
+	result->arguments = std::make_tuple(asdf);
+	result->start = (void (thistype::*)(funkname))
 			&chan_sans_output_read_t<t_in>::run;
 
 	return result;

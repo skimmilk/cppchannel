@@ -110,7 +110,7 @@ public:
 	}
 };
 template <typename t_in>
-csp::channel<t_in, t_in, bool> sort(bool a = false)
+csp::shared_ptr<csp::channel<t_in, t_in, bool>> sort(bool a = false)
 {
 	return csp::chan_create<
 			t_in, t_in, sort_t_<t_in>, bool>(a);
@@ -155,7 +155,7 @@ public:
 		}
 	}
 };
-template <typename t_in> csp::channel<t_in, t_in> uniq()
+template <typename t_in> csp::shared_ptr<csp::channel<t_in, t_in>> uniq()
 {
 	return csp::chan_create<
 			t_in, t_in, uniq_t<t_in>>();
@@ -202,14 +202,14 @@ public:
 	}
 };
 template <typename t_in>
-csp::channel<csp::nothing, t_in, std::vector<t_in>*>
+csp::shared_ptr<csp::channel<csp::nothing, t_in, std::vector<t_in>*>>
 		vec(std::vector<t_in>& kitty)
 {
-	channel<csp::nothing, t_in, std::vector<t_in>*> a;
-	a.arguments = std::make_tuple(&kitty);
+	auto a = csp::make_shared<channel<csp::nothing, t_in, std::vector<t_in>*>>();
+	a->arguments = std::make_tuple(&kitty);
 	// Fun fact: I figured out how to type this line
 	//  due to helpful compiler errors
-	a.start = (void(
+	a->start = (void(
 			channel<csp::nothing,t_in,std::vector<t_in>*>::*)
 		(std::vector<t_in>*))&cat_generic<t_in>::run;
 

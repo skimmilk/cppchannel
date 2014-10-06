@@ -158,21 +158,34 @@ public:
 	{
 		a->do_start();
 	}
+};
 
-public:
-	// The pipe | operator
+// Template to help dereference types
+template<typename s>
+struct dereference { typedef s type; };
+template<typename s>
+struct dereference<s*> { typedef typename dereference<s>::type type; };
+
+template<typename T>
+struct shared_ptr : std::shared_ptr<T>
+{
+	/* ========================
+	 * operator |
+	 * links channels together
+	 * ========================
+	 */
 	template <typename ot_in,typename ot_out,typename...ot_args>
-	channel<ot_in, ot_out, ot_args...>&
-		operator |(channel<ot_in,ot_out,ot_args...>&& pipe)
+	csp::shared_ptr<channel<ot_in, ot_out, ot_args...>>&
+	operator |(csp::shared_ptr<channel<ot_in,ot_out,ot_args...>>&& pipe)
 	{
 		// Force all writes to RAM
 		std::mutex a;
 		a.lock();
 
 		// this = left, pipe = right
-		background = true;
-		pipe.background = true;
-		pipe.csp_input = csp_output;
+		this->get()->background = true;
+		pipe->background = true;
+		pipe->csp_input = this->get()->csp_output;
 
 		a.unlock();
 
@@ -181,48 +194,65 @@ public:
 		// cat() | print()
 		if (is_nothing<ot_out>::value)
 		{
-			pipe.background = false;
-			worker = std::thread(begin_background, this);
-			pipe.do_start();
+			pipe->background = false;
+			this->get()->start_background();
+			pipe->do_start();
 		}
 		else
-			worker = std::thread(begin_background, this);
+			this->get()->start_background();
 
 		return pipe;
 	}
-
-	// The pipe-into operator must be >>= because >> gets executed before |
-	// This causes statements cat(file) | grab("stuff") >> vectorOfStrings
-	//   to error
-	this_pipe& operator >>=(std::vector<t_out>& out)
-	{
-		// Since this has to be executed last
-		//  this is the function that will block the calling thread
-		//  and wait for everything to finish
-		// So we execute everything in this thread instead of a background one
-		background = false;
-		do_start();
-		t_out& a = csp_output->last_read;
-		while (csp_output->read(a))
-			out.push_back(a);
-		return *this;
-	}
 };
 
+template<typename T>
+shared_ptr<T> make_shared()
+{
+	auto a = std::make_shared<T>();
+	return *(shared_ptr<T>*)&a;
+}
+
+/* ========================
+ * chan_create
+ * creates the channel, used in the declaration of channel functors
+ * ========================
+ */
 template <typename t_in, typename t_out, typename holder,
-		typename... t_args>
-static channel<t_in, t_out, t_args...>
-		chan_create(t_args... args)
+typename... t_args>
+static csp::shared_ptr<channel<t_in, t_out, t_args...>>
+chan_create(t_args... args)
 {
 	using this_pipe = channel<t_in,t_out,t_args...>;
 
-	this_pipe a;
-	a.arguments = std::make_tuple(args...);
+	auto a = csp::make_shared<this_pipe>();
+	a->arguments = std::make_tuple(args...);
 	// Fun fact: I figured out how to type this line
 	//  due to helpful compiler errors
-	a.start = (void(this_pipe::*)(t_args...))&holder::run;
+	a->start = (void(this_pipe::*)(t_args...))&holder::run;
 	return a;
 }
+
+// The pipe-into operator must be >>= because >> gets executed before |
+// This causes statements cat(file) | grab("stuff") >> vectorOfStrings
+//   to error
+template <typename tin, typename tout, typename... targs>
+csp::shared_ptr<channel<tin, tout, targs...>>&
+operator >>=(csp::shared_ptr<channel<tin,tout,targs...>>& in,
+		std::vector<tout>& out)
+{
+	// Since this has to be executed last
+	//  this is the function that will block the calling thread
+	//  and wait for everything to finish
+	// So we execute everything in this thread instead of a background one
+	in->background = false;
+	in->do_start();
+	tout a;
+	while (in->csp_output->read(a))
+		out.push_back(a);
+	return in;
+}
+
+
 
 } /* namespace csp */
 
