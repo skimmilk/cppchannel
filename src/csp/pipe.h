@@ -18,6 +18,9 @@
 namespace csp
 {
 
+template<typename T>
+struct shared_ptr;
+
 struct nothing { char a; };
 template<typename T> struct is_nothing { static const bool value = false; };
 template<> struct is_nothing<nothing> { static const bool value = true; };
@@ -30,12 +33,25 @@ public:
 	// Wait to write till this is filled
 	std::thread worker;
 
+	// True if work is done in the background
 	bool background;
+	// True if input/output must be deleted
 	bool manage_input;
-	message_stream<t_in>* csp_input;
+	bool manage_output;
 
-	bool unique_output;
+	message_stream<t_in>* csp_input;
 	message_stream<t_out>* csp_output;
+
+	// The channel that contains the pipeline information
+	channel* master;
+	// This references all of the channels in the pipeline to keep them alive
+	//   through their shared_ptr
+	// It enables the pipeline to be tasked in the background, instead of
+	//   being blocked
+	// For example, in the line: a() | b() | c()
+	// Two of the functors must be deleted before returning, because
+	//   the operator |'s must return only one channel
+	std::vector<csp::shared_ptr<this_pipe>> pipeline;
 
 	// The function pointer member to the function that this channel runs
 	void(this_pipe::*start)(t_args...) = 0;
@@ -47,8 +63,8 @@ public:
 	// Specifically fixes chan_read
 	std::tuple<t_args...> arguments;
 
-	channel() : background(false), manage_input(false), csp_input(NULL),
-			unique_output(true), csp_output(NULL)
+	channel() : background(false), manage_input(false), manage_output(true),
+			csp_input(NULL), csp_output(NULL), master(NULL)
 	{
 		if (!is_nothing<t_out>::value)
 			csp_output = new message_stream<t_out>();
@@ -59,7 +75,9 @@ public:
 		if (background)
 			worker.join();
 
-		if (!is_nothing<t_out>::value && unique_output)
+		pipeline.clear();
+
+		if (!is_nothing<t_out>::value && manage_output)
 			delete csp_output;
 		if (!is_nothing<t_in>::value && manage_input)
 			delete csp_input;
@@ -68,11 +86,12 @@ public:
 	channel(const this_pipe& src)
 	{
 		manage_input = src.manage_input;
-		unique_output = src.unique_output;
+		manage_output = src.manage_output;
 		csp_output = src.csp_output;
 		csp_input = src.csp_input;
 		background = src.background;
 		start = src.start;
+		master = src.master;
 	}
 
 	void put(const t_out& out)
@@ -89,15 +108,7 @@ public:
 	{
 		static_assert(!is_nothing<t_in>::value,
 				"Called read in csp pipe without input");
-
-		// Simple spinlock, wait for input to update
-		while (!csp_input)
-		{
-			std::mutex barrier;
-			barrier.lock();
-			if (csp_input) {barrier.unlock(); break;}
-			barrier.unlock();
-		}
+		spinlock(&csp_input);
 
 		return csp_input->read(input);
 	}
@@ -106,16 +117,18 @@ public:
 	{
 		static_assert(!is_nothing<t_in>::value,
 				"Called read in csp pipe without input");
-
-		while (!csp_input)
-		{
-			std::mutex barrier;
-			barrier.lock();
-			if (csp_input) {barrier.unlock(); break;}
-			barrier.unlock();
-		}
+		spinlock(&csp_input);
 
 		return csp_input->safe_read(input);
+	}
+
+	// Only call this if the channel was created through encap()
+	// This will message that this input is complete
+	void close_input()
+	{
+		csp_output->lock_this();
+		csp_output->done();
+		csp_output->unlock_this();
 	}
 
 	/* DO NOT TOUCH */
@@ -130,11 +143,27 @@ private:
 	}
 	/* END DO NOT TOUCH */
 
+	// Called by worker thread only, runs the runner
+	static void begin_background(this_pipe* a)
+	{
+		a->do_start();
+	}
+
+	template<typename T>
+	void spinlock(message_stream<T>** waiton)
+	{
+		std::mutex barrier;
+		while (*waiton == NULL)
+		{
+			barrier.lock();
+			if (*waiton) {barrier.unlock(); break;}
+			barrier.unlock();
+		}
+	}
 public:
 	// Starting point to finally do all the work
 	bool do_start()
 	{
-		assert(is_nothing<t_in>::value || csp_input != 0);
 		// Create a tuple with the this pointer and arguments together
 		// Works with the tuple expander call function easily
 		std::tuple<channel*> head (this);
@@ -143,7 +172,7 @@ public:
 		call(do_start_actually, thisargs);
 
 		// Finished processing input
-		if (!is_nothing<t_out>::value && unique_output)
+		if (!is_nothing<t_out>::value && manage_output)
 			csp_output->done();
 		return true;
 	}
@@ -151,12 +180,6 @@ public:
 	{
 		background = true;
 		worker = std::thread(begin_background, this);
-	}
-
-	// Called by worker thread only, runs the runner
-	static void begin_background(this_pipe* a)
-	{
-		a->do_start();
 	}
 };
 
@@ -172,6 +195,7 @@ struct shared_ptr : std::shared_ptr<T>
 	/* ========================
 	 * operator |
 	 * links channels together
+	 * returns the rightmost pipe when strung together
 	 * ========================
 	 */
 	template <typename ot_in,typename ot_out,typename...ot_args>
@@ -181,13 +205,23 @@ struct shared_ptr : std::shared_ptr<T>
 		// Force all writes to RAM
 		std::mutex a;
 		a.lock();
-
 		// this = left, pipe = right
-		this->get()->background = true;
-		pipe->background = true;
 		pipe->csp_input = this->get()->csp_output;
-
 		a.unlock();
+
+		auto thispipe = this->get();
+
+		if (thispipe->master == NULL)
+			thispipe->master = thispipe;
+
+		// Copy the master's stuff to the pipe and set the pipe as the master
+		pipe->master = pipe.get();
+
+		thispipe->master->pipeline.push_back(*this);
+		pipe->pipeline = ((decltype(pipe))thispipe)->master->pipeline;
+		thispipe->master->pipeline.clear();
+
+		thispipe->master = (decltype(this->get()))pipe.get();
 
 		// Right hand side doesn't output?
 		// Block further execution so we don't run over statements like
@@ -252,7 +286,43 @@ operator >>=(csp::shared_ptr<channel<tin,tout,targs...>>& in,
 	return in;
 }
 
+/* ========================
+ * encap
+ * Takes in a pipeline, returns a channel which writes to the
+ *   front of the pipeline and reads the end of the pipeline
+ * ========================
+ */
+template <typename tin, typename tout,
+		typename otin, typename otout, typename... otargs>
+csp::channel<tin, tout>
+	encap(csp::shared_ptr<csp::channel<otin, otout, otargs...>>& pipe)
+{
+	csp::channel<tin,tout> result;
 
+	std::mutex barrier;
+	barrier.lock();
+
+	// Merge the input/output with result's
+	// Users read this channel from csp_input, write to csp_output
+	// Leftmost is written to, rightmost is read from
+	pipe->pipeline.front()->csp_input = result.csp_output;
+	result.csp_input = pipe->csp_output;
+
+	// There exists a race condition when calling put() and close_input()
+	// Must lock when writing and closing
+	result.csp_input->always_lock = true;
+
+	barrier.unlock();
+
+	pipe->start_background();
+
+	// Put the master pipe into this vector so it stays referenced
+	//   until this encapsulation gets destroyed
+	auto push = (decltype(result.pipeline.front()))pipe;
+	result.pipeline.push_back(push);
+
+	return result;
+}
 
 } /* namespace csp */
 

@@ -36,7 +36,7 @@ public:
 			delete a.csp_output;
 			delete a.csp_input;
 			a.csp_output = this->csp_output;
-			a.unique_output = false;
+			a.manage_output = false;
 			a.csp_input = new csp::message_stream<t_in>();
 			a.manage_input = true;
 
@@ -107,7 +107,7 @@ public:
 		{
 			// Create the channel and set it up
 			channels.push_back(created_channel_t(functor(in)));
-			channels.back()->unique_output = false;
+			channels.back()->manage_output = false;
 			delete channels.back()->csp_output;
 			channels.back()->csp_output = this->csp_output;
 			channels.back()->background = true;
