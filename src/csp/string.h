@@ -19,10 +19,7 @@ class string : public std::vector<char>
 {
 public:
 	enum : size_t { npos = std::string::npos };
-	string()
-	{
-		this->reserve(8);
-	}
+	string(){}
 	string(const char* a)
 	{
 		assign(a);

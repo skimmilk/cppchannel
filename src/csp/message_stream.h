@@ -196,9 +196,8 @@ public:
 			if (!locked)
 				lock_this();
 
-			stream_cache tmp;
-			list.push_back(tmp);
 			list_size++;
+			list.emplace_back();
 
 			assert(list_size > 1);
 
