@@ -210,6 +210,7 @@ struct shared_ptr : std::shared_ptr<T>
 		a.unlock();
 
 		auto thispipe = this->get();
+		using pipe_type = channel<ot_in,ot_out,ot_args...>*;
 
 		if (thispipe->master == NULL)
 			thispipe->master = thispipe;
@@ -218,7 +219,7 @@ struct shared_ptr : std::shared_ptr<T>
 		pipe->master = pipe.get();
 
 		thispipe->master->pipeline.push_back(*this);
-		pipe->pipeline = ((decltype(pipe))thispipe)->master->pipeline;
+		pipe->pipeline = ((pipe_type)thispipe)->master->pipeline;
 		thispipe->master->pipeline.clear();
 
 		thispipe->master = (decltype(this->get()))pipe.get();
