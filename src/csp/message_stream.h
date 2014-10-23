@@ -137,10 +137,7 @@ public:
 			lock_this();
 
 			if (!items_remaining())
-			{
-				unlock_this();
 				return false;
-			}
 		}
 		assert(list_size != 0);
 		if (!read_list(true))
