@@ -61,19 +61,48 @@ public:
 	{
 		return this->size();
 	}
-	size_t find(const char* str) const
+	static const char* strstr(const char* a, int alen, const char* b, int blen)
 	{
-		const char* location = strstr(this->data(), str);
+		int ia = 0, ib = 0;
+		if (blen == 0) return a;
+		for (; ia < alen; ia++)
+		{
+			// Search for single-character match
+			if (a[ia] != b[ib])
+				continue;
+
+			int nia = ia;
+			// Compare the rest
+			while (true)
+			{
+				if (ib == blen)
+					return &a[nia];
+
+				if (a[nia++] != b[ib++])
+					break;
+			}
+			ib = 0;
+		}
+		return 0;
+	}
+	size_t find(const char* str, int len) const
+	{
+		const char* location = csp::string::strstr(
+				this->data(), this->size(), str, len);
 		if (!location) return npos;
 		return location - data();
 	}
+	size_t find(const char* str) const
+	{
+		return find(str, strlen(str));
+	}
 	size_t find(const std::string& str) const
 	{
-		return find(str.data());
+		return find(str.data(), str.length());
 	}
 	size_t find(const string& str) const
 	{
-		return find(str.data());
+		return find(str.data(), str.length());
 	}
 
 	string substr(size_t pos = 0, size_t len = npos) const
