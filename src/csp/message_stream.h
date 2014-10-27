@@ -153,7 +153,7 @@ public:
 			}
 		}
 
-		t = last_read;
+		t = std::move(last_read);
 		unlock_this();
 		return true;
 	}
@@ -162,7 +162,7 @@ public:
 	{
 		if (!do_read_simple(false))
 			return safe_read(t);
-		t = last_read;
+		t = std::move(last_read);
 		return true;
 	}
 
