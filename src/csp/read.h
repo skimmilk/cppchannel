@@ -33,7 +33,7 @@ public:
 	{
 		t_in line;
 		while (this->read(line))
-			if(a(line))	this->put(line);
+			if(a(line))	this->put(std::move(line));
 	}
 };
 // channel functor

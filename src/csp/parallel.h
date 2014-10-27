@@ -56,12 +56,7 @@ public:
 		}
 
 		for (auto& a : chans)
-		{
-			a.csp_input->lock_this();
-			a.csp_input->finished = true;
-			a.csp_input->unlock_write();
 			a.csp_input->done();
-		}
 	}
 };
 template <typename t_in, typename t_out, typename... t_args>

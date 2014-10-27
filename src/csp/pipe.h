@@ -157,6 +157,7 @@ private:
 			barrier.lock();
 			if (*waiton) {barrier.unlock(); break;}
 			barrier.unlock();
+			pthread_yield();
 		}
 	}
 public:

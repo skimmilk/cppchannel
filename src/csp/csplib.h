@@ -49,10 +49,7 @@ CSP_DECL(cat, csp::nothing, csp::string, const char*, std::atomic<int>*)
 		*error = 0;
 
 	while (std::getline(input, line))
-	{
-		csp::string a (line);
-		put(a);
-	}
+		put(csp::string(line));
 } // cat
 
 /* ================================
@@ -66,7 +63,7 @@ CSP_DECL(to_lower, csp::string, csp::string) ()
 	while (read(line))
 	{
 		std::transform(line.begin(), line.end(), line.begin(), ::tolower);
-		put(line);
+		put(std::move(line));
 	}
 }// to_lower
 
@@ -104,7 +101,7 @@ public:
 		int siz = output.size();
 		for (int i = 0; i < siz; i++)
 		{
-			this->put(output.front());
+			this->put(std::move(output.front()));
 			std::pop_heap(output.begin(), output.end() - i, functor);
 		}
 	}
@@ -128,7 +125,7 @@ CSP_DECL(grab, csp::string, csp::string, const char*, bool)
 	while (read(current_line))
 		// Put string if the currently line contains search
 		if ((current_line.find(search) == csp::string::npos) == invert)
-			put(current_line);
+			put(std::move(current_line));
 } // grab
 
 /* ================================
@@ -197,7 +194,7 @@ class cat_generic : public
 public:
 	void run(std::vector<t_in>* kitty)
 	{
-		for (auto& a : *kitty)
+		for (const auto& a : *kitty)
 			this->put(a);
 	}
 };
