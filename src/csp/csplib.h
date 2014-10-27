@@ -30,8 +30,12 @@ namespace csp{
 CSP_DECL(cat, csp::nothing, csp::string, const char*, std::atomic<int>*)
 												(const char* file, std::atomic<int>* error)
 {
-	std::string line;
-	std::ifstream input(file);
+	FILE* fp;
+	char* line = NULL;
+	size_t len = 0;
+	ssize_t read_amt;
+
+	fp = fopen(file, "r");
 
 	// Check for errors
 	// The CSP library does not implement fancy error propagation techniques
@@ -40,16 +44,21 @@ CSP_DECL(cat, csp::nothing, csp::string, const char*, std::atomic<int>*)
 	//   like the Unix counterpart.
 	// It would be unwise to use pass exceptions beyond the CSP function because
 	//   the listening channels would not be able to catch and clean up properly
-	if (input.fail())
-	{
+	if (fp == NULL)
 		*error = 1;
-		return;
-	}
-	else
-		*error = 0;
 
-	while (std::getline(input, line))
-		put(csp::string(line));
+	while ((read_amt = getline(&line, &len, fp)) != -1)
+	{
+		if (line[read_amt - 1] == '\n')
+			read_amt--;
+
+		string output;
+		output.setdata(line, read_amt, len);
+		this->put(std::move(output));
+
+		line = NULL;
+		len = 0;
+	}
 } // cat
 
 /* ================================
@@ -94,7 +103,7 @@ public:
 
 		while (this->read(line))
 		{
-			output.push_back(line);
+			output.push_back(std::move(line));
 			std::push_heap(output.begin(), output.end(), functor);
 		}
 
@@ -139,17 +148,21 @@ template <typename t_in> class uniq_t : public csp::channel<t_in,t_in>
 public:
 	void run()
 	{
-		// First, read one
 		t_in current, last;
-		if (!this->read(last))
-			return;
-		this->put(last);
+		bool shouldecho = false;
 		while(this->read(current))
 		{
 			if (current != last)
-				this->put(current);
-			last = current;
+			{
+				shouldecho = true;
+				this->put(std::move(last));
+				last = std::move(current);
+			}
+			else
+				shouldecho = false;
 		}
+		if (shouldecho)
+			this->put(std::move(last));
 	}
 };
 template <typename t_in> csp::shared_ptr<csp::channel<t_in, t_in>> uniq()
@@ -167,14 +180,14 @@ CSP_DECL(print, csp::string, csp::nothing)()
 {
 	csp::string line;
 	while (read(line))
-		std::cout << line.append("\n");
+		std::cout << line << "\n";
 } // print
 // Prints to stderr
 CSP_DECL(print_log, csp::string, csp::nothing)()
 {
 	csp::string line;
 	while (read(line))
-		std::cerr << line.append("\n");
+		std::cerr << line << "\n";
 } // print_log
 
 /* ================================

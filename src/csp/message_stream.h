@@ -101,7 +101,7 @@ public:
 		if (list_size == 0 || (list_size == 1 && readhead >= writehead))
 			return false;
 
-		last_read = std::move(list.front()[readhead++]);
+		std::swap(last_read, list.front()[readhead++]);
 		return true;
 	}
 	// Returns true on success, false on failure

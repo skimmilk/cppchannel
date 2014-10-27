@@ -25,7 +25,7 @@ CSP_DECL(elementize, string, vector<string>) ()
 			continue; // Ignore blanks
 		if (word.size() > result.size())
 			result.resize(word.size());
-		result[word.size()-1].push_back(word);
+		result[word.size()-1].push_back(std::move(word));
 	}
 	for (const auto& a : result)
 		put(std::move(a));

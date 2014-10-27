@@ -44,8 +44,8 @@ public:
 	}
 	string& append(const std::string& rh)
 	{
-		for (auto& b : rh)
-			this->push_back(b);
+		this->reserve(this->size() + rh.size());
+		memcpy(this->data() + this->size(), rh.c_str(), rh.size());
 		return *this;
 	}
 	string& append(const char* a)
@@ -61,19 +61,21 @@ public:
 	{
 		return this->size();
 	}
+	size_t find(const char* str) const
+	{
+		const char* location = strstr(this->data(), str);
+		if (!location) return npos;
+		return location - data();
+	}
 	size_t find(const std::string& str) const
 	{
-		return std_string().find(str);
+		return find(str.data());
 	}
 	size_t find(const string& str) const
 	{
-		return find(str.std_string());
+		return find(str.data());
 	}
-	size_t find(const char* str) const
-	{
-		std::string a (str);
-		return find(a);
-	}
+
 	string substr(size_t pos = 0, size_t len = npos) const
 	{
 		string a;
@@ -95,10 +97,6 @@ public:
 		std::string a (str);
 		return compare(a);
 	}
-	void assign(const string& str)
-	{
-		*this = str;
-	}
 	void assign(const char* a)
 	{
 		while (*a)
@@ -114,8 +112,16 @@ public:
 	}
 	void assign(const std::string& str)
 	{
-		for (auto a : str)
-			push_back(a);
+		this->reserve(this->size() + str.size());
+		memcpy(this->data() + this->size(), str.c_str(), str.size());
+		this->_M_impl._M_finish = this->data() + this->size() + str.size();
+	}
+	void setdata(char* a, ssize_t slen, size_t buffsiz)
+	{
+		delete this->data();
+		this->_M_impl._M_start = a;
+		this->_M_impl._M_finish = a + slen;
+		this->_M_impl._M_end_of_storage = a + buffsiz;
 	}
 	std::string std_string() const
 	{
