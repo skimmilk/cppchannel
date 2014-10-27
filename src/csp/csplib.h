@@ -59,6 +59,10 @@ CSP_DECL(cat, csp::nothing, csp::string, const char*, std::atomic<int>*)
 		line = NULL;
 		len = 0;
 	}
+
+	fclose(fp);
+	if (line)
+		free(line);
 } // cat
 
 /* ================================
