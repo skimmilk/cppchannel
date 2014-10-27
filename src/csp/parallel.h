@@ -50,7 +50,7 @@ public:
 		int write_to_index = 0;
 		while (this->read(current))
 		{
-			chans[write_to_index].csp_input->write(current);
+			chans[write_to_index].csp_input->write(std::move(current));
 			write_to_index++;
 			write_to_index %= threadcount;
 		}
