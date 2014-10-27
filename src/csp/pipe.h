@@ -98,10 +98,9 @@ public:
 	{
 		csp_output->write(out);
 	}
-	// Needed if multiple threads accessing this channel
-	void safe_put(const t_out& out)
+	void put(t_out&& out)
 	{
-		csp_output->safe_write(out);
+		csp_output->write(std::forward<t_out>(out));
 	}
 
 	bool read(t_in& input)

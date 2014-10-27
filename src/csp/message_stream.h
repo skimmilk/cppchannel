@@ -101,7 +101,7 @@ public:
 		if (list_size == 0 || (list_size == 1 && readhead >= writehead))
 			return false;
 
-		last_read = list.front()[readhead++];
+		last_read = std::move(list.front()[readhead++]);
 		return true;
 	}
 	// Returns true on success, false on failure
@@ -166,7 +166,7 @@ public:
 		return true;
 	}
 
-	void do_write(const T& t, bool locked)
+	T& get_write_reference(bool locked)
 	{
 		// Is the list empty?
 		if (list_size == 0)
@@ -203,23 +203,20 @@ public:
 		// This go last because list_size gets updated during the lock
 		// write() needs this updated variable so we don't have an old value
 		//   and write to the front of the list
-		list.back()[writehead++] = t;
+		return list.back()[writehead++];
 	}
-	// Will safely write the item to the list
-	void safe_write(const T& t)
+	// Safely return the reference to the place to write in the cache line
+	// Assumes lock is locked
+	T& safe_reference()
 	{
-		lock_this();
-
-		// If the list is empty
+		// If the list is empty, create it
 		if (list_size == 0)
 		{
 			list.resize(1);
 			list_size++;
 			writehead = 0;
 		}
-		do_write(t, true);
-
-		unlock_write();
+		return get_write_reference(true);
 	}
 	// Returns true on success, false on failure
 	// Write item to the stream
@@ -229,9 +226,24 @@ public:
 		//   as the front of the list will be written to
 		//   and there might be a reader waiting
 		if (always_lock || list_size <= 2)
-			safe_write(t);
+		{
+			lock_this();
+			safe_reference() = t;
+			unlock_write();
+		}
 		else
-			do_write(t, false);
+			get_write_reference(false) = t;
+	}
+	void write(T&& t)
+	{
+		if (always_lock || list_size <= 2)
+		{
+			lock_this();
+			safe_reference() = std::move(t);
+			unlock_write();
+		}
+		else
+			get_write_reference(false) = std::move(t);
 	}
 
 	void done()

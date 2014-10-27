@@ -27,8 +27,8 @@ CSP_DECL(elementize, string, vector<string>) ()
 			result.resize(word.size());
 		result[word.size()-1].push_back(word);
 	}
-	for (auto& a : result)
-		put(a);
+	for (const auto& a : result)
+		put(std::move(a));
 }
 
 // This finds 'word stacks' (I don't know what its really called)
@@ -42,12 +42,15 @@ CSP_DECL(genlist, nothing, wordpair, int)(int length)
 			put({a, ""});
 	else
 	{
-		auto thisptr = this;
+		// Because parallel spawns multiple threads that may write to out output
+		// Lock it when writing
+		this->csp_output->always_lock = true;
+
 		// Recursion works!
 		genlist(length - 1) |
 			// Read every word genlist sends into variable 'shorter'
 			parallel(3,
-					chan_read<wordpair>([thisptr,length](wordpair& shorter)
+					chan_read<wordpair>([this,length](wordpair& shorter)
 			{
 				// Try to get a word that differs in one character
 				// If previous is 'i', next will be 'in', 'is',...
@@ -59,7 +62,7 @@ CSP_DECL(genlist, nothing, wordpair, int)(int length)
 							difference++;
 
 					if (difference <= 1)
-						thisptr->safe_put({longer,
+						this->put({longer,
 							shorter.word + " " + shorter.whatmadeit});
 				}
 			})
