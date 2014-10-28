@@ -62,10 +62,15 @@ public:
 	//   that this should always lock when writing items
 	bool always_lock;
 
+	// This tells us to unbuffer output
+	// Reads are blocked until a cache line fills up if false
+	bool unbuffered;
+
 	std::atomic_bool finished;
 
 	message_stream() : readhead(0), writehead(0), writehead_finished(0),
-			list_size(0), waiting(0), always_lock(false), finished(false)
+			list_size(0), waiting(0), always_lock(false), unbuffered(false),
+			finished(false)
 	{}
 
 	// Returns true if there are items remaining in the list
@@ -192,13 +197,10 @@ public:
 
 			assert(list_size > 1);
 
-			// Because readers might be waiting, we will want to message to
-			//   those waiting every so often and now is a good opportunity
 			if (!locked)
-				unlock_write();
-			else
-				// We are locked but still want to message
-				notify_readers();
+				unlock_this();
+			// A cache line has been filled, so blocked readers should be notified
+			notify_readers();
 		}
 		// This go last because list_size gets updated during the lock
 		// write() needs this updated variable so we don't have an old value
@@ -229,7 +231,9 @@ public:
 		{
 			lock_this();
 			safe_reference() = t;
-			unlock_write();
+			unlock_this();
+			if (unbuffered)
+				notify_readers();
 		}
 		else
 			get_write_reference(false) = t;
@@ -240,7 +244,9 @@ public:
 		{
 			lock_this();
 			safe_reference() = std::move(t);
-			unlock_write();
+			unlock_this();
+			if (unbuffered)
+				notify_readers();
 		}
 		else
 			get_write_reference(false) = std::move(t);
@@ -269,11 +275,6 @@ public:
 	{
 		if (waiting)
 			wait_lock.notify_all();
-	}
-	void unlock_write()
-	{
-		list_lock.unlock();
-		notify_readers();
 	}
 	void wait_write()
 	{

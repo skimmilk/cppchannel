@@ -12,6 +12,6 @@ CSP_DECL(sleepsort, nothing, string, int)(int in)
 int main()
 {
 	std::vector<int> nums {3, 5, 1, 2, 4, 0};
-	vec(nums) | schedule(sleepsort) | print();
+	vec(nums) | unbuffer(schedule(sleepsort)) | print();
 	return 0;
 }

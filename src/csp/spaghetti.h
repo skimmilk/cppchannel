@@ -1,5 +1,5 @@
 // Testing shows that for wordstack, this is the optimal value
-#define CSP_CACHE_DEFAULT 32
+#define CSP_CACHE_DEFAULT 64
 
 #define CSP_DECL_CONTAINER(fn_name, input, output, ...)\
 	class _##fn_name##_t_ : public\

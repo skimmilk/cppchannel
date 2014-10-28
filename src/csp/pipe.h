@@ -325,6 +325,19 @@ csp::channel<tin, tout>
 	return result;
 }
 
+/* ========================
+ * unbuffer
+ * Takes in a single channel, turns off write buffering
+ * ========================
+ */
+template <typename tin, typename tout, typename... targs>
+csp::shared_ptr<csp::channel<tin, tout, targs...>>
+	unbuffer(csp::shared_ptr<csp::channel<tin,tout,targs...>>&& channel)
+{
+	channel->csp_output->unbuffered = true;
+	return channel;
+}
+
 } /* namespace csp */
 
 #endif /* CSP_H_ */
