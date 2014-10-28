@@ -283,7 +283,7 @@ operator >>=(csp::shared_ptr<channel<tin,tout,targs...>>& in,
 	in->do_start();
 	tout a;
 	while (in->csp_output->read(a))
-		out.push_back(a);
+		out.push_back(std::move(a));
 	return in;
 }
 
