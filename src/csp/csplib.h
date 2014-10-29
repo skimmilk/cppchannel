@@ -45,7 +45,10 @@ CSP_DECL(cat, csp::nothing, csp::string, const char*, std::atomic<int>*)
 	// It would be unwise to use pass exceptions beyond the CSP function because
 	//   the listening channels would not be able to catch and clean up properly
 	if (fp == NULL)
+	{
 		*error = 1;
+		return;
+	}
 
 	while ((read_amt = getline(&line, &len, fp)) != -1)
 	{
