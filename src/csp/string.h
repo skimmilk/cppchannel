@@ -36,6 +36,14 @@ public:
 	{
 		return append(rh);
 	}
+	string& operator +=(const std::string& rh)
+	{
+		return append(rh);
+	}
+	string& operator +=(char rh)
+	{
+		return append(rh);
+	}
 	string& append(const string& rh)
 	{
 		for (auto& b : rh)
@@ -55,6 +63,11 @@ public:
 			push_back(*a);
 			a++;
 		}
+		return *this;
+	}
+	string& append(char a)
+	{
+		push_back(a);
 		return *this;
 	}
 	size_t length() const
