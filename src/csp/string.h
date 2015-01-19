@@ -54,6 +54,7 @@ public:
 	{
 		this->reserve(this->size() + rh.size());
 		memcpy(this->data() + this->size(), rh.c_str(), rh.size());
+		this->_M_impl._M_finish += rh.size();
 		return *this;
 	}
 	string& append(const char* a)
