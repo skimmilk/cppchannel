@@ -10,6 +10,7 @@
 
 #include <csp/pipe.h>
 
+namespace csp {
 /* ================================================================
  * parallel
  * Used to make the processing of input happen over multiple threads
@@ -137,4 +138,5 @@ csp::shared_ptr<csp::channel
 	return a;
 }/* schedule */
 
+}; // namespace csp
 #endif /* PARALLELIZE_H_ */
